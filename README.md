@@ -2,6 +2,8 @@
 
 ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that uses AI to automatically process and categorize your receipts and expenses.
 
+🔗 **Demo**: [expensebot.xyz](https://expensebot.xyz)
+
 ⚠️ **CAUTION**: This is an experimental project for personal use only. Do not rely on it for official bookkeeping or tax purposes. The AI can make mistakes and the accuracy of the processing is not guaranteed.
 
 ## Features
