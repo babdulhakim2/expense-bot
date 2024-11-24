@@ -17,10 +17,17 @@ from datetime import datetime, timezone
 from googleapiclient.discovery import build
 from services.gemini_service import GeminiService
 from config import Config
+from google.cloud import secretmanager
+import wandb
+from googleapiclient.errors import HttpError
 
 load_dotenv()  # take environment variables from .env.
 
-weave.init(project_name="expense-bot")
+# Initialize wandb with API key before using weave
+# wandb.login(key=os.getenv('WANDB_API_KEY'))
+
+# # Then initialize weave
+# weave.init(project_name="expense-bot")
 
 # Set up logging configuration at the top of the file after imports
 logging.basicConfig(
@@ -43,8 +50,22 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-# Authenticate with Google APIs
-creds = ServiceAccountCredentials.from_json_keyfile_name(Config.GOOGLE_SERVICE_ACCOUNT_KEY, scope)
+try:
+    # Write service account key to a temporary file
+    import tempfile
+    import json
+    
+    service_account_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
+    json.dump(json.loads(Config.SERVICE_ACCOUNT_KEY), service_account_file)
+    service_account_file.close()
+    
+    # Update your credentials initialization
+    creds = ServiceAccountCredentials.from_json_keyfile_name(service_account_file.name, scope)
+    
+except Exception as e:
+    logger.error(f"Failed to initialize credentials: {str(e)}")
+    raise
+
 sheets_client = gspread.authorize(creds)
 drive_service = build('drive', 'v3', credentials=creds)
 
@@ -77,12 +98,51 @@ def get_or_create_user_folder(phone_number):
             folder_id = result[0]
             logger.info(f"Found existing folder for {phone_number}: {folder_id}")
             
-            # Check and share folder if not already shared
             email = os.environ.get('MY_EMAIL')
-            permissions = drive_service.permissions().list(
-                fileId=folder_id,
-                fields="permissions(emailAddress)"
-            ).execute().get('permissions', [])
+            try:
+                permissions = drive_service.permissions().list(
+                    fileId=folder_id,
+                    fields="permissions(emailAddress)"
+                ).execute().get('permissions', [])
+            except HttpError as e:
+                if e.resp.status == 404:
+                    logger.warning(f"Folder {folder_id} not found. Recreating folder.")
+                    # Remove the invalid folder_id from database
+                    c.execute('DELETE FROM users WHERE phone_number = ?', (phone_number,))
+                    conn.commit()
+                    
+                    # Create new folder
+                    folder_metadata = {
+                        'name': f'Expenses_{phone_number}',
+                        'mimeType': 'application/vnd.google-apps.folder'
+                    }
+                    folder = drive_service.files().create(
+                        body=folder_metadata,
+                        fields='id'
+                    ).execute()
+                    folder_id = folder.get('id')
+                    
+                    # Share the new folder
+                    permission = {
+                        'type': 'user',
+                        'role': 'writer',
+                        'emailAddress': email
+                    }
+                    drive_service.permissions().create(
+                        fileId=folder_id,
+                        body=permission,
+                        sendNotificationEmail=False
+                    ).execute()
+                    
+                    # Update database with new folder_id
+                    c.execute('UPDATE users SET folder_id = ? WHERE phone_number = ?', (folder_id, phone_number))
+                    conn.commit()
+                    
+                    logger.info(f"Recreated and shared folder for {phone_number}: {folder_id}")
+                    return folder_id
+                else:
+                    logger.error(f"Failed to list permissions for folder {folder_id}: {str(e)}")
+                    raise e
             
             if not any(p.get('emailAddress') == email for p in permissions):
                 logger.info(f"Sharing folder with {email}")
@@ -134,9 +194,15 @@ def get_or_create_user_folder(phone_number):
         logger.info(f"Created new folder for {phone_number}: {folder_id}")
         return folder_id
         
-    except Exception as e:
-        logger.error(f"Error managing user folder: {str(e)}")
+    except HttpError as e:
+        # Handle other API errors
+        logger.error(f"Failed to manage folder due to API error: {str(e)}")
         raise e
+    
+    except Exception as e:
+        logger.error(f"Failed to manage user folder: {str(e)}")
+        raise e
+    
     finally:
         conn.close()
 
@@ -360,7 +426,53 @@ def whatsapp():
         msg.body("Sorry, something went wrong. Please try again.")
         return str(msg)
 
+wandb_enabled = False  # Global flag
+
+def init_wandb():
+    global wandb_enabled
+    try:
+        wandb_key = Config.WANDB_API_KEY
+       
+
+        if not wandb_key:
+            logger.warning("WANDB_API_KEY not found, W&B features will be disabled")
+            return False
+        
+        # Clean the API key
+        wandb_key = wandb_key.strip().strip('"\'').strip()
+        
+        if len(wandb_key) != 40:
+            logger.error(f"Invalid API key length: {len(wandb_key)}. Expected 40 characters.")
+            return False
+        
+        wandb.login(key=wandb_key)
+        weave.init(project_name="expense-bot")
+        os.environ["WANDB_CONFIG_DIR"] = "/tmp"
+        # wandb_enabled = True
+        logger.info("Successfully initialized Weights & Biases")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to initialize Weights & Biases: {str(e)}")
+        return False
+
+# Call this during app startup
+init_wandb()
+
+def access_secret_version(project_id, secret_id):
+    """
+    Access the secret version.
+    """
+    try:
+        client = secretmanager.SecretManagerServiceClient()
+        name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
+        response = client.access_secret_version(request={"name": name})
+        return response.payload.data.decode("UTF-8")
+    except Exception as e:
+        logger.error(f"Error accessing secret {secret_id}: {str(e)}")
+        raise
 
 if __name__ == '__main__':
     init_database()  # Initialize SQLite database
-    app.run(host='0.0.0.0', port=9004, debug=True)
+    # app.run(host='0.0.0.0', port=9004, debug=True)
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)

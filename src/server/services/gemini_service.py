@@ -12,8 +12,8 @@ from config import Config
 logger = logging.getLogger(__name__)
 
 class GeminiService:
-    def __init__(self, api_key=None):
-        genai.configure(api_key=api_key or Config.GEMINI_API_KEY)
+    def __init__(self):
+        genai.configure(api_key=Config.GOOGLE_GENERATIVE_AI_API_KEY)
         self.model = genai.GenerativeModel(
             model_name=Config.GEMINI_MODEL,
             generation_config=Config.GEMINI_GENERATION_CONFIG

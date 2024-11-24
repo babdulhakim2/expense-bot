@@ -1,0 +1,30 @@
+runtime: python312
+instance_class: F1
+
+entrypoint: python3 app.py
+
+automatic_scaling:
+  target_cpu_utilization: 0.65
+  min_instances: 1
+  max_instances: 2
+  target_throughput_utilization: 0.6
+
+env_variables:
+  ENVIRONMENT: "production"
+  PROJECT_ID: "642983317730"
+  GEMINI_MODEL: "gemini-1.5-flash"
+  GEMINI_TEMPERATURE: "0.1"
+  GEMINI_TOP_P: "0.95"
+  GEMINI_TOP_K: "40"
+  GEMINI_MAX_OUTPUT_TOKENS: "8192"
+  DATABASE_NAME: "expenses.db"
+  DEFAULT_USER_EMAIL: "abdulhakim.gafai@gmail.com"
+
+# Include sensitive environment variables from a separate file
+includes:
+  - env_variables.yaml  # Make sure this matches your actual filename
+
+handlers:
+  - url: /.*
+    script: auto
+    secure: always
