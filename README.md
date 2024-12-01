@@ -23,7 +23,7 @@ ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that uses fine
 
 - **Frontend**: Next.js 18+, TypeScript, Tailwind CSS
 - **Backend**: Python, Flask
-- **AI/ML**: Google Gemini AI
+- **AI/ML**: Gemma 2B, Palli Gemma 
 - **Storage**: Google Drive, Google Sheets, Firebase Firestore
 - **Authentication**: Firebase Authentication
 - **Messaging**: Twilio WhatsApp API
