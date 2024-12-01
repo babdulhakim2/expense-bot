@@ -5,10 +5,12 @@ steps:
       - "DOCKER_BUILDKIT=1"
     args:
       - build
+      - --no-cache
+      - --progress=plain
       - --build-arg
       - HF_TOKEN=${_HF_TOKEN}
       - --secret
-      - id=HF_TOKEN,env=_HF_TOKEN
+      - id=HF_TOKEN,env=HF_TOKEN
       - --tag=${_IMAGE}
       - .
 
@@ -16,7 +18,7 @@ images: ["${_IMAGE}"]
 
 substitutions:
   _IMAGE: "us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-gemma-2-2b-it-repo/vllm-gemma-2-2b-it"
-  _HF_TOKEN: ""
+  _HF_TOKEN: "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"
 
 options:
   dynamicSubstitutions: true

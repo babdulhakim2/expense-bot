@@ -18,6 +18,11 @@ declare module "next-auth" {
   }
 }
 
+interface Token {
+  id?: string;
+  phoneNumber?: string | null;
+}
+
 const verifyToken = async (token: string): Promise<DecodedIdToken | null> => {
   // if (process.env.NODE_ENV === 'development') {
   //   // In development, parse the token directly since it's from the emulator
@@ -89,15 +94,15 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
-        token.phoneNumber = user.phoneNumber;
+        (token as Token).id = user.id;
+        (token as Token).phoneNumber = user.phoneNumber;
       }
       return token;
     },
     async session({ session, token }) {
       if (session?.user) {
-        session.user.id = token.id;
-        session.user.phoneNumber = token.phoneNumber;
+        session.user.id = (token as Token).id!;
+        session.user.phoneNumber = (token as Token).phoneNumber;
       }
       return session;
     },

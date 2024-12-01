@@ -13,11 +13,12 @@ const firebaseConfig = {
 // Initialize Firebase only once
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
+auth.settings.appVerificationDisabledForTesting = false;
 
 // Connect to emulator in development
-// if (process.env.NODE_ENV === 'development') {
-//   console.log('Connecting to Firebase Auth Emulator on http://localhost:9099');
-//   connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
-// }
+if (process.env.NODE_ENV === 'development') {
+  console.log('Connecting to Firebase Auth Emulator on http://localhost:9099');
+  connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+}
 
 export { app, auth }; 
