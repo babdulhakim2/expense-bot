@@ -13,3 +13,6 @@ weave>=0.51.19
 protobuf>=4.25.1
 google-cloud-secret-manager>=2.18.0
 wandb>=0.16.3
+fastapi
+uvicorn
+google-auth 

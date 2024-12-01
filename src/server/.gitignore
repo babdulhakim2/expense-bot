@@ -67,3 +67,6 @@ coverage.xml
 *.so
 *.dylib
 *.db
+env_variables.yaml
+env_secrets.yaml
+.env

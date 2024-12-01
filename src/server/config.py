@@ -22,23 +22,26 @@ class Config:
         "max_output_tokens": int(os.getenv('GEMINI_MAX_OUTPUT_TOKENS', '8192')),
     }
 
-    # Database Configuration
-    DATABASE_NAME = os.getenv('DATABASE_NAME', 'expenses.db')
-    
     # API Keys and Credentials
     GOOGLE_GENERATIVE_AI_API_KEY = os.getenv('GOOGLE_GENERATIVE_AI_API_KEY')
     SERVICE_ACCOUNT_KEY = os.getenv('SERVICE_ACCOUNT_KEY')
+    FIREBASE_SERVICE_ACCOUNT_KEY = os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY')
     WANDB_API_KEY = os.getenv('WANDB_API_KEY')
     
     # User Configuration
     DEFAULT_USER_EMAIL = os.getenv('DEFAULT_USER_EMAIL', '')
+    
+    # Firebase Emulator Settings
+    FIREBASE_EMULATOR_HOST = os.getenv('FIREBASE_EMULATOR_HOST', 'localhost:8080')
+    USE_FIREBASE_EMULATOR = os.getenv('USE_FIREBASE_EMULATOR', 'true').lower() == 'true'
     
     @classmethod
     def validate_config(cls):
         """Validate required configuration values"""
         required_keys = [
             'GOOGLE_GENERATIVE_AI_API_KEY',
-            'SERVICE_ACCOUNT_KEY'
+            'SERVICE_ACCOUNT_KEY',
+            'FIREBASE_SERVICE_ACCOUNT_KEY'
         ]
         
         missing_keys = [key for key in required_keys if not getattr(cls, key)]
@@ -52,6 +55,17 @@ class Config:
                 json.loads(cls.SERVICE_ACCOUNT_KEY)
         except json.JSONDecodeError as e:
             raise ValueError(f"SERVICE_ACCOUNT_KEY is not valid JSON: {str(e)}")
+        
+        # Validate Firebase configuration
+        if not cls.FIREBASE_SERVICE_ACCOUNT_KEY:
+            raise ValueError("Missing required configuration key: FIREBASE_SERVICE_ACCOUNT_KEY")
+        
+        # Validate FIREBASE_SERVICE_ACCOUNT_KEY is valid JSON
+        try:
+            if isinstance(cls.FIREBASE_SERVICE_ACCOUNT_KEY, str):
+                json.loads(cls.FIREBASE_SERVICE_ACCOUNT_KEY)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"FIREBASE_SERVICE_ACCOUNT_KEY is not valid JSON: {str(e)}")
         
         # Set additional config values
         cls.GOOGLE_SERVICE_ACCOUNT_KEY = cls.SERVICE_ACCOUNT_KEY

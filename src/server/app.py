@@ -20,6 +20,9 @@ from config import Config
 from google.cloud import secretmanager
 import wandb
 from googleapiclient.errors import HttpError
+import firebase_admin
+from firebase_admin import credentials, firestore
+import json
 
 load_dotenv()  # take environment variables from .env.
 
@@ -69,36 +72,24 @@ except Exception as e:
 sheets_client = gspread.authorize(creds)
 drive_service = build('drive', 'v3', credentials=creds)
 
-# Add these after the existing imports
-def init_database():
-    conn = sqlite3.connect('expenses.db')
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            phone_number TEXT PRIMARY KEY,
-            folder_id TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            name TEXT,
-            email TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
+# Initialize Firebase Admin SDK
+firebase_creds = json.loads(Config.FIREBASE_SERVICE_ACCOUNT_KEY)
+cred = credentials.Certificate(firebase_creds)
+firebase_admin.initialize_app(cred)
 
+db = firestore.client()
+
+# Add these after the existing imports
 def get_or_create_user_folder(phone_number):
     try:
-        conn = sqlite3.connect('expenses.db')
-        c = conn.cursor()
+        user_ref = db.collection('users').document(phone_number)
+        user = user_ref.get()
         
-        # Check if user exists
-        c.execute('SELECT folder_id FROM users WHERE phone_number = ?', (phone_number,))
-        result = c.fetchone()
-        
-        if result:
-            folder_id = result[0]
+        if user.exists:
+            folder_id = user.to_dict().get('folder_id')
+            user_email = user.to_dict().get('email')
             logger.info(f"Found existing folder for {phone_number}: {folder_id}")
             
-            email = os.environ.get('MY_EMAIL')
             try:
                 permissions = drive_service.permissions().list(
                     fileId=folder_id,
@@ -107,11 +98,8 @@ def get_or_create_user_folder(phone_number):
             except HttpError as e:
                 if e.resp.status == 404:
                     logger.warning(f"Folder {folder_id} not found. Recreating folder.")
-                    # Remove the invalid folder_id from database
-                    c.execute('DELETE FROM users WHERE phone_number = ?', (phone_number,))
-                    conn.commit()
                     
-                    # Create new folder
+                    # Recreate folder in Google Drive
                     folder_metadata = {
                         'name': f'Expenses_{phone_number}',
                         'mimeType': 'application/vnd.google-apps.folder'
@@ -126,7 +114,7 @@ def get_or_create_user_folder(phone_number):
                     permission = {
                         'type': 'user',
                         'role': 'writer',
-                        'emailAddress': email
+                        'emailAddress': user_email
                     }
                     drive_service.permissions().create(
                         fileId=folder_id,
@@ -134,9 +122,10 @@ def get_or_create_user_folder(phone_number):
                         sendNotificationEmail=False
                     ).execute()
                     
-                    # Update database with new folder_id
-                    c.execute('UPDATE users SET folder_id = ? WHERE phone_number = ?', (folder_id, phone_number))
-                    conn.commit()
+                    # Update Firestore with new folder_id
+                    user_ref.update({
+                        'folder_id': folder_id
+                    })
                     
                     logger.info(f"Recreated and shared folder for {phone_number}: {folder_id}")
                     return folder_id
@@ -144,12 +133,12 @@ def get_or_create_user_folder(phone_number):
                     logger.error(f"Failed to list permissions for folder {folder_id}: {str(e)}")
                     raise e
             
-            if not any(p.get('emailAddress') == email for p in permissions):
-                logger.info(f"Sharing folder with {email}")
+            if not any(p.get('emailAddress') == user_email for p in permissions):
+                logger.info(f"Sharing folder with {user_email}")
                 permission = {
                     'type': 'user',
                     'role': 'writer',
-                    'emailAddress': email
+                    'emailAddress': user_email
                 }
                 drive_service.permissions().create(
                     fileId=folder_id,
@@ -158,7 +147,7 @@ def get_or_create_user_folder(phone_number):
                 ).execute()
             
             return folder_id
-            
+        
         # Create new folder in Google Drive
         folder_metadata = {
             'name': f'Expenses_{phone_number}',
@@ -171,12 +160,11 @@ def get_or_create_user_folder(phone_number):
         folder_id = folder.get('id')
         
         # Share the new folder
-        email = os.environ.get('MY_EMAIL')
-        logger.info(f"Sharing new folder with {email}")
+        user_email = user.to_dict().get('email') if user.exists else os.environ.get('DEFAULT_USER_EMAIL')
         permission = {
             'type': 'user',
             'role': 'writer',
-            'emailAddress': email
+            'emailAddress': user_email
         }
         drive_service.permissions().create(
             fileId=folder_id,
@@ -184,27 +172,23 @@ def get_or_create_user_folder(phone_number):
             sendNotificationEmail=False
         ).execute()
         
-        # Store user info
-        c.execute('''
-            INSERT INTO users (phone_number, folder_id) 
-            VALUES (?, ?)
-        ''', (phone_number, folder_id))
-        conn.commit()
+        # Store user info in Firestore
+        user_ref.set({
+            'folder_id': folder_id,
+            'created_at': firestore.SERVER_TIMESTAMP,
+            'email': user_email
+        })
         
-        logger.info(f"Created new folder for {phone_number}: {folder_id}")
+        logger.info(f"Created and shared new folder for {phone_number}: {folder_id}")
         return folder_id
-        
+
     except HttpError as e:
-        # Handle other API errors
         logger.error(f"Failed to manage folder due to API error: {str(e)}")
         raise e
     
     except Exception as e:
         logger.error(f"Failed to manage user folder: {str(e)}")
         raise e
-    
-    finally:
-        conn.close()
 
 def get_or_create_spreadsheet(phone_number):
     try:
@@ -345,7 +329,7 @@ def whatsapp():
         incoming_msg = request.values.get('Body', '').strip()
         num_media = int(request.values.get('NumMedia', 0))
         
-        # Remove chat sessions since we're using stateless requests
+        # Extract phone number
         phone_number = user_id.replace('whatsapp:', '')
         logger.info(f"Received message from {phone_number}: {incoming_msg}")
         
@@ -381,6 +365,13 @@ def whatsapp():
             msg.body(response)
             return str(resp)
             
+        # Retrieve user email from Firestore
+        user_doc = db.collection('users').document(phone_number).get()
+        if user_doc.exists:
+            user_email = user_doc.to_dict().get('email')
+        else:
+            user_email = os.environ.get('DEFAULT_USER_EMAIL')  # Fallback email
+        
         # Update spreadsheet with transaction
         spreadsheet_url, transaction_id = update_expense_sheet(
             datetime.strptime(transaction['transaction_date'], '%Y-%m-%d'),
@@ -472,7 +463,6 @@ def access_secret_version(project_id, secret_id):
         raise
 
 if __name__ == '__main__':
-    init_database()  # Initialize SQLite database
     # app.run(host='0.0.0.0', port=9004, debug=True)
-    port = int(os.environ.get('PORT', 8080))
+    port = int(os.environ.get('PORT', 9004))
     app.run(host='0.0.0.0', port=port)
