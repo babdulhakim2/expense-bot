@@ -215,7 +215,7 @@ class GeminiService:
             is_transaction = 'YES' in check_result.text.upper()
 
             if not is_transaction:
-                return False, {}, "This doesn't seem to be a transaction. Please describe an expense like:\n'Spent $25 on lunch'\n'Bought groceries for $50'"
+                return False, {}, "This doesn't seem to be a transaction. Please provide a receipt or transaction details."
 
             # Extract transaction details
             extract_prompt = f"""Extract transaction details from this message.
