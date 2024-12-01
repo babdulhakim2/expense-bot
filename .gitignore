@@ -9,7 +9,7 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
-
+.venv
 # testing
 /coverage
 
@@ -38,3 +38,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Google Cloud
+env_variables.yaml
+*.pyc
+__pycache__/
+.pytest_cache/
+
+
+Receipt.v1i.paligemma
+
+.next

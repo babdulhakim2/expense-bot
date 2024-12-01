@@ -20,5 +20,123 @@ ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that uses AI t
 - **Frontend**: Next.js 18+, TypeScript, Tailwind CSS
 - **Backend**: Python, Flask
 - **AI/ML**: Google Gemini AI
-- **Storage**: Google Drive, Google Sheets
+- **Storage**: Google Drive, Google Sheets, Firebase Firestore
+- **Authentication**: Firebase Authentication
 - **Messaging**: Twilio WhatsApp API
+
+## Configuration
+
+1. **Firebase Setup:**
+   
+   - **Create a Firebase Project:**
+     - Go to [Firebase Console](https://console.firebase.google.com/) and create a new project.
+   
+   - **Enable Authentication:**
+     - Navigate to **Authentication** > **Sign-in method**.
+     - Enable **Phone** authentication.
+   
+   - **Set Up Firestore:**
+     - Navigate to **Firestore Database**.
+     - Create a new Firestore database in **Production** mode.
+   
+   - **Generate Service Account Key:**
+     - Go to **Project Settings** > **Service Accounts**.
+     - Click on **Generate new private key** and download the JSON file.
+     - Copy the content of this JSON file.
+   
+2. **Environment Variables:**
+   
+   Ensure all required environment variables are set in `.env` file or `env_variables.yaml`:
+   
+   ```env
+   ENVIRONMENT=production
+   PROJECT_ID=your-google-cloud-project-id
+   
+   GEMINI_MODEL=gemini-1.5-flash
+   GEMINI_TEMPERATURE=0.1
+   GEMINI_TOP_P=0.95
+   GEMINI_TOP_K=40
+   GEMINI_MAX_OUTPUT_TOKENS=8192
+   
+   # DATABASE_NAME is deprecated in favor of Firestore
+   
+   GOOGLE_GENERATIVE_AI_API_KEY=your-google-generative-ai-api-key
+   SERVICE_ACCOUNT_KEY=your-google-service-account-key  # Deprecated
+   FIREBASE_SERVICE_ACCOUNT_KEY=your-firebase-service-account-key  # Added
+   
+   WANDB_API_KEY=your-wandb-api-key
+   
+   DEFAULT_USER_EMAIL=your-default-user-email
+   MY_EMAIL=your-email-for-folder-sharing  # Ensure this is set
+   ```
+   
+   - **FIREBASE_SERVICE_ACCOUNT_KEY:** Paste the JSON content from the generated Firebase service account key.
+
+3. **Firebase Configuration in Frontend:**
+   
+   Create a Firebase configuration file for the frontend:
+      ````javascript
+   // src/config/firebaseConfig.ts
+   export const firebaseConfig = {
+     apiKey: "YOUR_API_KEY",
+     authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+     projectId: "YOUR_PROJECT_ID",
+     storageBucket: "YOUR_PROJECT_ID.appspot.com",
+     messagingSenderId: "YOUR_SENDER_ID",
+     appId: "YOUR_APP_ID"
+   };   ````
+   
+   - Replace the placeholder values with your actual Firebase project credentials.
+
+4. **Update Dependencies:**
+   
+   After modifying `package.json`, install the new dependencies:
+   
+   ```bash
+   yarn install
+   # or
+   npm install
+   ```
+
+5. **Deploy with Firebase Integration:**
+   
+   Follow the existing deployment steps. Ensure that Firebase-related environment variables are correctly set in your deployment environment.
+
+## Authentication Flow
+
+1. **User Visits Landing Page:**
+   - Enters their phone number.
+
+2. **OTP Verification:**
+   - User receives an OTP via WhatsApp and enters it on the website.
+
+3. **Collect User Information:**
+   - After successful OTP verification, the user is prompted to enter their name and email.
+
+4. **Redirect to WhatsApp:**
+   - Upon completion, the user is redirected to WhatsApp to start interacting with the bot.
+
+## Deployment
+
+1. Install Google Cloud SDK
+2. Enable required APIs:
+   ```bash
+   gcloud services enable iam.googleapis.com
+   gcloud services enable cloudbuild.googleapis.com
+   gcloud services enable cloudresourcemanager.googleapis.com
+   gcloud services enable appengine.googleapis.com
+   ```
+3. Configure your project:
+   ```bash
+   gcloud config set project expense-bot-441618
+   ```
+4. Deploy from the `src/server` directory:
+   ```bash
+   cd src/server
+   pip install -r requirements.txt  # Test locally first
+   python -m pytest  # If you have tests
+   gcloud app deploy
+   ```
+5. Visit your app at: https://expense-bot-441618.uc.r.appspot.com
+
+Note: Make sure all required environment variables are set in `env_variables.yaml`
