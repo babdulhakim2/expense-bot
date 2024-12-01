@@ -1,6 +1,10 @@
 # ExpenseBot - AI-Powered Bookkeeping Assistant
 
-ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that uses AI to automatically process and categorize your receipts and expenses.
+ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that uses fine-tuned version of PalliGemma to automatically process and categorize your images of receipts and expenses. 
+
+- It interacts with Google Drive API to organize accounting records, wit sheets and drive folders.
+- It also automatially detect the tax code(UK only) to enable easy VAT recording for small businesses
+
 
 🔗 **Demo**: [expensebot.xyz](https://expensebot.xyz)
 
@@ -24,7 +28,7 @@ ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that uses AI t
 - **Authentication**: Firebase Authentication
 - **Messaging**: Twilio WhatsApp API
 
-## Configuration
+## Web hook and Auth Configuration
 
 1. **Firebase Setup:**
    
@@ -52,7 +56,7 @@ ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that uses AI t
    ENVIRONMENT=production
    PROJECT_ID=your-google-cloud-project-id
    
-   GEMINI_MODEL=gemini-1.5-flash
+   GEMINI_MODEL=gemini-1.5-pro (Ask fallback model)
    GEMINI_TEMPERATURE=0.1
    GEMINI_TOP_P=0.95
    GEMINI_TOP_K=40
@@ -102,19 +106,6 @@ ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that uses AI t
    
    Follow the existing deployment steps. Ensure that Firebase-related environment variables are correctly set in your deployment environment.
 
-## Authentication Flow
-
-1. **User Visits Landing Page:**
-   - Enters their phone number.
-
-2. **OTP Verification:**
-   - User receives an OTP via WhatsApp and enters it on the website.
-
-3. **Collect User Information:**
-   - After successful OTP verification, the user is prompted to enter their name and email.
-
-4. **Redirect to WhatsApp:**
-   - Upon completion, the user is redirected to WhatsApp to start interacting with the bot.
 
 ## Deployment
 
@@ -137,6 +128,5 @@ ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that uses AI t
    python -m pytest  # If you have tests
    gcloud app deploy
    ```
-5. Visit your app at: https://expense-bot-441618.uc.r.appspot.com
 
 Note: Make sure all required environment variables are set in `env_variables.yaml`
