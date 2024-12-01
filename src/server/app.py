@@ -15,6 +15,7 @@ import logging
 import sqlite3
 from datetime import datetime, timezone
 from googleapiclient.discovery import build
+from services.gemma2_service import Gemma2Service
 from services.gemini_service import GeminiService
 from config import Config
 from google.cloud import secretmanager
@@ -42,7 +43,8 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # Initialize services with config
-gemini_service = GeminiService()  # No need to pass API key, it uses config
+gemma2_service = Gemma2Service()  # Primary service
+gemini_service = GeminiService()  # Fallback service
 
 # Dictionary to maintain chat history per user
 chat_sessions = {}
@@ -350,16 +352,30 @@ def whatsapp():
                 msg.body("Sorry, I couldn't download the file. Please try again.")
                 return str(resp)
                 
-            # Process the media
-            is_transaction, transaction, response = gemini_service.process_media(
+            # Try Gemma first
+            is_transaction, transaction, response = gemma2_service.process_media(
                 media_response.content,
                 media_type,
                 incoming_msg
             )
             
+            # Fall back to Gemini if Gemma fails
+            if not is_transaction:
+                logger.info("Gemma processing failed, falling back to Gemini")
+                is_transaction, transaction, response = gemini_service.process_media(
+                    media_response.content,
+                    media_type,
+                    incoming_msg
+                )
+            
         else:
-            # Process text message
-            is_transaction, transaction, response = gemini_service.extract_transaction(incoming_msg)
+            # Try Gemma first for text processing
+            is_transaction, transaction, response = gemma2_service.extract_transaction(incoming_msg)
+            
+            # Fall back to Gemini if Gemma fails
+            if not is_transaction:
+                logger.info("Gemma text processing failed, falling back to Gemini")
+                is_transaction, transaction, response = gemini_service.extract_transaction(incoming_msg)
         
         if not is_transaction:
             msg.body(response)
