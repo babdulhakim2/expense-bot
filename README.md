@@ -1,6 +1,6 @@
 # ExpenseBot - AI-Powered Bookkeeping Assistant
 
-ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that uses fine-tuned version of PalliGemma to automatically process and categorize your images of receipts and expenses. 
+ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that uses fine-tuned version of [PalliGemma](https://huggingface.co/superfunguy/palligemma-receipts-Gemma2-challenge) to automatically process and categorize your images of receipts and expenses. 
 
 - It interacts with Google Drive API to organize accounting records, wit sheets and drive folders.
 - It also automatially detect the tax code(UK only) to enable easy VAT recording for small businesses
@@ -23,10 +23,15 @@ ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that uses fine
 
 - **Frontend**: Next.js 18+, TypeScript, Tailwind CSS
 - **Backend**: Python, Flask
-- **AI/ML**: Gemma 2B, Palli Gemma 
+- **AI/ML**: Gemma 2B,  [Palli Gemma Fine-tuned](https://huggingface.co/superfunguy/palligemma-receipts-Gemma2-challenge)
 - **Storage**: Google Drive, Google Sheets, Firebase Firestore
 - **Authentication**: Firebase Authentication
 - **Messaging**: Twilio WhatsApp API
+
+
+## Fine-Tunning
+The fine tunning is done with a subset(500 image eamples) of Receipt Dataset from roboflow which can be found here: [Dataset]( https://universe.roboflow.com/elh-datasets/receipt-ebx3a). And the training/val sets where labels with Google Gemeni 1.5 Pro for Image -> JSON extraction 
+
 
 ## Web hook and Auth Configuration
 
