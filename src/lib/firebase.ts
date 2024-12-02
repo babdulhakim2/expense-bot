@@ -11,7 +11,7 @@ const firebaseConfig = {
 };
 
 // Add debug logs
-console.log('Current NODE_ENV:', process.env.NEXT_PUBLIC_NODE_ENV);
+console.log('Current NEXT_PUBLIC_NODE_ENV:', process.env.NEXT_PUBLIC_NODE_ENV);
 console.log('Is development?:', process.env.NEXT_PUBLIC_NODE_ENV === 'development');
 
 // Initialize Firebase
@@ -19,7 +19,7 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 const auth = getAuth(app);
 
 // Connect to emulator in development
-if (process.env.NEXT_PUBLIC_NODE_ENV !== 'development') {
+if (process.env.NEXT_PUBLIC_NODE_ENV === 'development') {
   console.log('🔧 Using Firebase Auth Emulator');
   auth.settings.appVerificationDisabledForTesting = true;
   connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
