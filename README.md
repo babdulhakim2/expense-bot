@@ -1,137 +1,105 @@
 # ExpenseBot - AI-Powered Bookkeeping Assistant
 
-ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that uses fine-tuned version of [PalliGemma](https://huggingface.co/superfunguy/palligemma-receipts-Gemma2-challenge) to automatically process and categorize your images of receipts and expenses. 
-
-- It interacts with Google Drive API to organize accounting records, wit sheets and drive folders.
-- It also automatially detect the tax code(UK only) to enable easy VAT recording for small businesses
-
+ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that automatically processes and categorizes receipts using AI. It combines fine-tuned [PalliGemma](https://huggingface.co/superfunguy/palligemma-receipts-Gemma2-challenge) for receipt processing with Google Workspace integration for organized bookkeeping.
 
 🔗 **Demo**: [expensebot.xyz](https://expensebot.xyz)
 
-⚠️ **CAUTION**: This is an experimental project for personal use only. Do not rely on it for official bookkeeping or tax purposes. The AI can make mistakes and the accuracy of the processing is not guaranteed.
+## How It Works
 
-## Features
+1. **Receipt Processing**
+   - Send receipts via WhatsApp
+   - AI extracts key information (amount, date, items, merchant)
+   - Supports multiple currencies with automatic conversion
 
-- 📱 **WhatsApp Integration**: Simply send your receipts via WhatsApp
-- 🤖 **AI-Powered Processing**: Automatic extraction and categorization of receipt information
-- 📊 **Google Sheets Integration**: Automated expense tracking in organized spreadsheets
-- 🔒 **Secure & Private**: End-to-end encryption for your financial data
-- ⚡ **Real-time Processing**: Instant analysis and categorization of expenses
-- 📁 **Google Drive Integration**: Organized storage of receipt images and data
+2. **Automated Organization**
+   - Creates dedicated Google Drive folders per phone number
+   - Maintains organized Google Sheets for expense tracking
+   - Automatically categorizes transactions
+   - Handles VAT recording for UK businesses
+
+3. **Easy Access**
+   - View expenses through WhatsApp or web interface
+   - Access organized spreadsheets directly
+   - Track spending patterns and categories
 
 ## Tech Stack
 
 - **Frontend**: Next.js 18+, TypeScript, Tailwind CSS
-- **Backend**: Python, Flask
-- **AI/ML**: Gemma 2B,  [Palli Gemma Fine-tuned](https://huggingface.co/superfunguy/palligemma-receipts-Gemma2-challenge)
-- **Storage**: Google Drive, Google Sheets, Firebase Firestore
-- **Authentication**: Firebase Authentication
-- **Messaging**: Twilio WhatsApp API
+- **Backend**: Python, Flask, Twilio API
+- **AI/ML**: 
+  - Gemma 2B (VLLM inference server)
+  - [PalliGemma Fine-tuned](https://huggingface.co/superfunguy/palligemma-receipts-Gemma2-challenge)
+  - Gemini Pro (fallback model)
+- **Infrastructure**: 
+  - Firebase (Auth, Firestore)
+  - Google Cloud (App Engine, Cloud Build)
+  - Google Drive API (Drive, Sheets)
+  - Whatsapp and Twilio API for bot interaction
 
+## Project Structure
 
-## Fine-Tunning
-The fine tunning is done with a subset(500 image eamples) of Receipt Dataset from roboflow which can be found here: [Dataset]( https://universe.roboflow.com/elh-datasets/receipt-ebx3a). And the training/val sets where labels with Google Gemeni 1.5 Pro for Image -> JSON extraction 
+```
+expensebot/
+├── src/
+│   ├── components/     # Frontend React components
+│   ├── lib/           # Shared utilities
+│   └── server/        # Python backend (see server/README.md)
+```
 
+## Development Setup
 
-## Web hook and Auth Configuration
-
-1. **Firebase Setup:**
-   
-   - **Create a Firebase Project:**
-     - Go to [Firebase Console](https://console.firebase.google.com/) and create a new project.
-   
-   - **Enable Authentication:**
-     - Navigate to **Authentication** > **Sign-in method**.
-     - Enable **Phone** authentication.
-   
-   - **Set Up Firestore:**
-     - Navigate to **Firestore Database**.
-     - Create a new Firestore database in **Production** mode.
-   
-   - **Generate Service Account Key:**
-     - Go to **Project Settings** > **Service Accounts**.
-     - Click on **Generate new private key** and download the JSON file.
-     - Copy the content of this JSON file.
-   
-2. **Environment Variables:**
-   
-   Ensure all required environment variables are set in `.env` file or `env_variables.yaml`:
-   
-   ```env
-   ENVIRONMENT=production
-   PROJECT_ID=your-google-cloud-project-id
-   
-   GEMINI_MODEL=gemini-1.5-pro (Ask fallback model)
-   GEMINI_TEMPERATURE=0.1
-   GEMINI_TOP_P=0.95
-   GEMINI_TOP_K=40
-   GEMINI_MAX_OUTPUT_TOKENS=8192
-   
-   # DATABASE_NAME is deprecated in favor of Firestore
-   
-   GOOGLE_GENERATIVE_AI_API_KEY=your-google-generative-ai-api-key
-   SERVICE_ACCOUNT_KEY=your-google-service-account-key  # Deprecated
-   FIREBASE_SERVICE_ACCOUNT_KEY=your-firebase-service-account-key  # Added
-   
-   WANDB_API_KEY=your-wandb-api-key
-   
-   DEFAULT_USER_EMAIL=your-default-user-email
-   MY_EMAIL=your-email-for-folder-sharing  # Ensure this is set
-   ```
-   
-   - **FIREBASE_SERVICE_ACCOUNT_KEY:** Paste the JSON content from the generated Firebase service account key.
-
-3. **Firebase Configuration in Frontend:**
-   
-   Create a Firebase configuration file for the frontend:
-      ````javascript
-   // src/config/firebaseConfig.ts
-   export const firebaseConfig = {
-     apiKey: "YOUR_API_KEY",
-     authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-     projectId: "YOUR_PROJECT_ID",
-     storageBucket: "YOUR_PROJECT_ID.appspot.com",
-     messagingSenderId: "YOUR_SENDER_ID",
-     appId: "YOUR_APP_ID"
-   };   ````
-   
-   - Replace the placeholder values with your actual Firebase project credentials.
-
-4. **Update Dependencies:**
-   
-   After modifying `package.json`, install the new dependencies:
-   
+1. **Frontend Setup**
    ```bash
-   yarn install
-   # or
-   npm install
+   # Install dependencies
+   bun install
+
+   # Start development server
+   bun run dev
    ```
 
-5. **Deploy with Firebase Integration:**
-   
-   Follow the existing deployment steps. Ensure that Firebase-related environment variables are correctly set in your deployment environment.
+2. **Environment Variables**
+   Create `.env.local`:
+   ```env
+   # Firebase Config
+   NEXT_PUBLIC_FIREBASE_API_KEY=
+   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+   NEXT_PUBLIC_FIREBASE_PROJECT_ID=
 
+   # Development Settings
+   NEXT_PUBLIC_NODE_ENV=development
+   ```
+
+3. **Backend Setup**
+   See [Server README](src/server/README.md) for:
+   - WhatsApp webhook setup
+   - AI model deployment
+   - Google Workspace integration
+
+## AI Model Training
+
+The receipt processing model was fine-tuned on:
+- Dataset: [Receipt Dataset](https://universe.roboflow.com/elh-datasets/receipt-ebx3a) (500 examples)
+- Labels: Generated using Google Gemini 1.5 Pro
+- Format: Image → JSON extraction
 
 ## Deployment
 
-1. Install Google Cloud SDK
-2. Enable required APIs:
+1. **Frontend**: Firebase Hosting
    ```bash
-   gcloud services enable iam.googleapis.com
-   gcloud services enable cloudbuild.googleapis.com
-   gcloud services enable cloudresourcemanager.googleapis.com
-   gcloud services enable appengine.googleapis.com
-   ```
-3. Configure your project:
-   ```bash
-   gcloud config set project expense-bot-441618
-   ```
-4. Deploy from the `src/server` directory:
-   ```bash
-   cd src/server
-   pip install -r requirements.txt  # Test locally first
-   python -m pytest  # If you have tests
-   gcloud app deploy
+   bun run build
+   vercel deploy
    ```
 
-Note: Make sure all required environment variables are set in `env_variables.yaml`
+2. **Backend**: See [Server Deployment](src/server/README.md#deployment)
+   - App Engine for webhook
+   - Cloud Build for AI inference
+
+## Contributing
+
+Contributions welcome! Please read:
+1. [Contributing Guidelines](CONTRIBUTING.md)
+2. [Server Development Guide](src/server/README.md)
+
+## License
+
+MIT License - see [LICENSE](LICENSE)
