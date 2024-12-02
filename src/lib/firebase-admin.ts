@@ -8,29 +8,30 @@ const formatPrivateKey = (key: string) => {
 
 if (!getApps().length) {
   if (process.env.NODE_ENV === 'development') {
-    // Use emulator in development
-    process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST = 'localhost:9099';
-    
+    process.env.FIREBASE_AUTH_EMULATOR_HOST = 'localhost:9099';
+
     initializeApp({
       projectId: 'demo-project-id',
     });
-    
+
     console.log('Firebase Admin initialized with emulator');
   } else {
-    // Use production credentials
-    const privateKey = process.env.NEXT_PUBLIC_FIREBASE_PRIVATE_KEY;
-    if (!privateKey) {
-      throw new Error('FIREBASE_PRIVATE_KEY is not set in environment variables');
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+
+    if (!privateKey || !projectId || !clientEmail) {
+      throw new Error('Missing required Firebase configuration. Check your environment variables.');
     }
 
     try {
-      initializeApp({
-        credential: cert({
-          projectId: process.env.FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-        }),
+      const credential = cert({
+        projectId,
+        clientEmail,
+        privateKey,
       });
+
+      initializeApp({ credential });
       console.log('Firebase Admin initialized in production mode');
     } catch (error) {
       console.error('Error initializing Firebase Admin:', error);
