@@ -24,36 +24,28 @@ interface Token {
 }
 
 const verifyToken = async (token: string): Promise<DecodedIdToken | null> => {
-  // if (process.env.NODE_ENV === 'development') {
-  //   // In development, parse the token directly since it's from the emulator
-  //   try {
-  //     const [header, payload, signature] = token.split('.');
-  //     const decodedPayload = JSON.parse(Buffer.from(payload, 'base64').toString());
-  //     console.log('Development token payload:', decodedPayload);
-  //     return decodedPayload;
-  //   } catch (error) {
-  //     console.error('Error parsing development token:', error);
-  //     return null;
-  //   }
-  // } else {
-  //   // In production, verify the token properly
-  //   try {
-  //     return await adminAuth.verifyIdToken(token);
-  //   } catch (error) {
-  //     console.error('Error verifying production token:', error);
-  //     return null;
-  //   }
-  // }
-
-  try {
-    const [header, payload, signature] = token.split('.');
-    const decodedPayload = JSON.parse(Buffer.from(payload, 'base64').toString());
-    console.log('Development token payload:', decodedPayload);
-    return decodedPayload;
-  } catch (error) {
-    console.error('Error parsing development token:', error);
-    return null;
+  if (process.env.NODE_ENV === 'development') {
+    // In development, parse the token directly since it's from the emulator
+    try {
+      const [header, payload, signature] = token.split('.');
+      const decodedPayload = JSON.parse(Buffer.from(payload, 'base64').toString());
+      console.log('Development token payload:', decodedPayload);
+      return decodedPayload;
+    } catch (error) {
+      console.error('Error parsing development token:', error);
+      return null;
+    }
+  } else {
+    // In production, verify the token properly
+    try {
+      return await adminAuth.verifyIdToken(token);
+    } catch (error) {
+      console.error('Error verifying production token:', error);
+      return null;
+    }
   }
+
+  
 };
 
 export const authOptions: NextAuthOptions = {

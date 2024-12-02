@@ -362,7 +362,6 @@ export function AuthForms() {
       const response = await signIn('credentials', {
         token: idToken,
         redirect: false,
-        callbackUrl: '/',
       });
 
       if (response?.error) {
@@ -374,8 +373,8 @@ export function AuthForms() {
         description: "Phone number verified successfully!",
       });
 
-    //   router.replace('/dashboard');
-    window.location.href = '/dashboard';
+      router.replace('/dashboard');
+    // window.location.href = '/dashboard';
     } catch (error: any) {
       console.error('Error verifying code:', error);
       const errorMessage = error.code === 'auth/invalid-verification-code' 

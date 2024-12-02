@@ -7,7 +7,7 @@ const formatPrivateKey = (key: string) => {
 };
 
 if (!getApps().length) {
-  if (process.env.NEXT_PUBLIC_NODE_ENV === 'development') {
+  if (process.env.NODE_ENV === 'development') {
     // Use emulator in development
     process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST = 'localhost:9099';
     
@@ -26,9 +26,9 @@ if (!getApps().length) {
     try {
       initializeApp({
         credential: cert({
-          projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-          clientEmail: process.env.NEXT_PUBLIC_FIREBASE_CLIENT_EMAIL,
-          privateKey: formatPrivateKey(privateKey),
+          projectId: process.env.FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
         }),
       });
       console.log('Firebase Admin initialized in production mode');
