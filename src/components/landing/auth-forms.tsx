@@ -5,10 +5,11 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { auth } from '@/lib/firebase';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
-import { ArrowRight, Flag } from 'lucide-react';
-import { signIn } from 'next-auth/react';
+import { ArrowRight, Flag, LogOut } from 'lucide-react';
+import { signIn, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import React, { FormEvent, useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
 
 declare global {
   interface Window {
@@ -76,6 +77,9 @@ function OTPInput({ value, onChange, disabled }: OTPInputProps) {
 }
 
 export function AuthForms() {
+  // Move ALL hooks to the top, before any conditional returns
+  const { data: session } = useSession();
+  const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
   const [phone, setPhone] = useState<string>('');
   const [verificationCode, setVerificationCode] = useState<string>('');
@@ -83,14 +87,11 @@ export function AuthForms() {
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
   const [error, setError] = useState<string>('');
   const [cooldownTime, setCooldownTime] = useState<number | null>(null);
-  
   const { toast } = useToast();
-  const router = useRouter();
 
-  // Clean up reCAPTCHA on mount
+  // useEffect hooks should also be at the top level
   useEffect(() => {
     return () => {
-      // Cleanup on component unmount
       if (window.recaptchaVerifier) {
         try {
           window.recaptchaVerifier.clear();
@@ -99,13 +100,11 @@ export function AuthForms() {
           console.error('Error clearing reCAPTCHA:', error);
         }
       }
-      // Remove any existing reCAPTCHA iframes
       const iframes = document.querySelectorAll('iframe[src*="recaptcha"]');
       iframes.forEach(iframe => iframe.remove());
     };
   }, []);
 
-  // Handle cooldown timer
   useEffect(() => {
     if (cooldownTime && Date.now() >= cooldownTime) {
       setCooldownTime(null);
@@ -119,6 +118,34 @@ export function AuthForms() {
 
     return () => clearInterval(interval);
   }, [cooldownTime]);
+
+  // Now we can have conditional renders
+  if (session) {
+    return (
+      <div className="flex flex-col items-center justify-center w-full mt-8 space-y-6">
+        <p className="text-xl text-muted-foreground">
+          Welcome back! 👋
+        </p>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <Button 
+            size="lg"
+            onClick={() => router.push('/dashboard')}
+            className="min-w-[200px]"
+          >
+            Go to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+          <Button 
+            size="lg"
+            variant="outline"
+            onClick={() => signOut({ callbackUrl: '/' })}
+            className="min-w-[200px]"
+          >
+            Sign Out <LogOut className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const formatTimeRemaining = (milliseconds: number): string => {
     const seconds = Math.ceil(milliseconds / 1000);
@@ -332,14 +359,10 @@ export function AuthForms() {
       const result = await confirmationResult.confirm(verificationCode);
       const idToken = await result.user.getIdToken();
 
-      // Get the callback URL from the query parameters or use default
-      const urlParams = new URLSearchParams(window.location.search);
-      const callbackUrl =  '/';
-
       const response = await signIn('credentials', {
         token: idToken,
         redirect: false,
-        callbackUrl,
+        callbackUrl: '/',
       });
 
       if (response?.error) {
@@ -351,7 +374,6 @@ export function AuthForms() {
         description: "Phone number verified successfully!",
       });
 
-      // Use router.replace instead of push to avoid the URL issue
     //   router.replace('/dashboard');
     window.location.href = '/dashboard';
     } catch (error: any) {
@@ -366,6 +388,22 @@ export function AuthForms() {
         variant: "destructive",
       });
       setError(errorMessage);
+      // Add a manual redirect link when automatic redirect fails
+      toast({
+        title: "Verification Success",
+        description: (
+          <div className="space-y-2">
+            <p>{errorMessage}</p>
+            <a 
+              href="/dashboard" 
+              className="text-primary hover:underline block"
+            >
+              Click here to go to dashboard manually →
+            </a>
+          </div>
+        ),
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }

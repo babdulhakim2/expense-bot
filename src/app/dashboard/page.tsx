@@ -1,15 +1,24 @@
 'use client';
 
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { QRCodeSVG } from "qrcode.react";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Home, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 
 const WHATSAPP_NUMBER = "447949366218"; // Remove the + for the API format
 const WHATSAPP_MESSAGE = "Hi! I'd like to start tracking my expenses.";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
+  const router = useRouter();
+  
+  const handleSignOut = async () => {
+    await signOut({ 
+      redirect: true,
+      callbackUrl: '/' 
+    });
+  };
   
   // Function to handle WhatsApp redirect
   const handleWhatsAppRedirect = () => {
@@ -29,6 +38,26 @@ export default function DashboardPage() {
 
   return (
     <div className="container mx-auto p-8">
+      <div className="flex justify-between items-center mb-8">
+        <Button
+          variant="ghost"
+          onClick={() => router.push('/')}
+          className="flex items-center gap-2"
+        >
+          <Home className="w-4 h-4" />
+          Home
+        </Button>
+
+        <Button
+          variant="ghost"
+          onClick={handleSignOut}
+          className="flex items-center gap-2 text-destructive hover:text-destructive"
+        >
+          <LogOut className="w-4 h-4" />
+          Sign Out
+        </Button>
+      </div>
+
       <div className="max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold mb-4 text-center">
           Welcome to ExpenseBot!
