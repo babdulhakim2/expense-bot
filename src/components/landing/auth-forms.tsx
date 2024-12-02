@@ -332,10 +332,14 @@ export function AuthForms() {
       const result = await confirmationResult.confirm(verificationCode);
       const idToken = await result.user.getIdToken();
 
+      // Get the callback URL from the query parameters or use default
+      const urlParams = new URLSearchParams(window.location.search);
+      const callbackUrl = urlParams.get('callbackUrl') || '/dashboard';
+
       const response = await signIn('credentials', {
         token: idToken,
         redirect: false,
-        callbackUrl: '/dashboard'
+        callbackUrl,
       });
 
       if (response?.error) {
@@ -346,7 +350,9 @@ export function AuthForms() {
         title: "Success",
         description: "Phone number verified successfully!",
       });
-      router.push('/dashboard');
+
+      // Use router.replace instead of push to avoid the URL issue
+      router.replace('/dashboard');
     } catch (error: any) {
       console.error('Error verifying code:', error);
       const errorMessage = error.code === 'auth/invalid-verification-code' 

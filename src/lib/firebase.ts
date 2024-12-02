@@ -24,7 +24,7 @@ if (process.env.NEXT_PUBLIC_NODE_ENV === 'development') {
   auth.settings.appVerificationDisabledForTesting = true;
   connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
 } else {
-  console.log('⚠️ Not using Firebase Auth Emulator');
+  console.log('⚠️ Using Production Firebase Auth');
 }
 
 export { app, auth };
