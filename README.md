@@ -1,6 +1,6 @@
 # ExpenseBot - AI-Powered Bookkeeping Assistant
 
-ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that automatically processes and categorizes receipts using AI. It combines fine-tuned [PalliGemma](https://huggingface.co/superfunguy/palligemma-receipts-Gemma2-challenge) for receipt processing with Google Workspace integration for organized bookkeeping.
+ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that automatically processes and categorizes receipts using AI. It combines fine-tuned [PalliGemma](https://huggingface.co/superfunguy/palligemma-receipts-Gemma2-challenge/tree/main) for receipt processing with Google Workspace integration for organized bookkeeping.
 
 🔗 **Demo**: [expensebot.xyz](https://expensebot.xyz)
 
@@ -28,7 +28,7 @@ ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that automatic
 - **Backend**: Python, Flask, Twilio API
 - **AI/ML**: 
   - Gemma 2B (VLLM inference server)
-  - [PalliGemma Fine-tuned](https://huggingface.co/superfunguy/palligemma-receipts-Gemma2-challenge)
+  - [PalliGemma Fine-tuned](https://huggingface.co/superfunguy/palligemma-receipts-Gemma2-challenge/tree/main)
   - Gemini Pro (fallback model)
 - **Infrastructure**: 
   - Firebase (Auth, Firestore)
@@ -78,7 +78,7 @@ expensebot/
 ## AI Model Training
 
 The receipt processing model was fine-tuned on:
-- Dataset: [Receipt Dataset](https://universe.roboflow.com/elh-datasets/receipt-ebx3a) (500 examples)
+- Dataset: Sub-set of [Receipt Dataset](https://universe.roboflow.com/elh-datasets/receipt-ebx3a) (500 examples)
 - Labels: Generated using Google Gemini 1.5 Pro
 - Format: Image → JSON extraction
 
