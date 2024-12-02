@@ -18,7 +18,7 @@ images: ["${_IMAGE}"]
 
 substitutions:
   _IMAGE: "us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-gemma-2-2b-it-repo/vllm-gemma-2-2b-it"
-  _HF_TOKEN: "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"
+  _HF_TOKEN: ""
 
 options:
   dynamicSubstitutions: true

@@ -58,22 +58,18 @@ expensebot/
    ```
 
 2. **Environment Variables**
-   Create `.env.local`:
-   ```env
-   # Firebase Config
-   NEXT_PUBLIC_FIREBASE_API_KEY=
-   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
-   NEXT_PUBLIC_FIREBASE_PROJECT_ID=
-
-   # Development Settings
-   NEXT_PUBLIC_NODE_ENV=development
-   ```
+   Create `.env.local` by copying `.env.example` and replacing the values with your own Firebase configuration.
 
 3. **Backend Setup**
    See [Server README](src/server/README.md) for:
    - WhatsApp webhook setup
    - AI model deployment
    - Google Workspace integration
+
+4. **Required Tokens**
+   - Firebase configuration (see Environment Variables section)
+   - [Hugging Face Access Token](https://huggingface.co/settings/tokens) for model access
+   - Google Cloud project credentials
 
 ## AI Model Training
 

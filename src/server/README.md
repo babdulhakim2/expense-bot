@@ -131,29 +131,19 @@ Deploy a high-performance Gemma 2B inference server using VLLM and Cloud Build.
    # From src/server directory
    gcloud builds submit \
      --config cloudbuild.yaml \
-     --substitutions=_HF_TOKEN="your_huggingface_token"
+     --substitutions=_HF_TOKEN="$(gcloud secrets versions access latest --secret=HF_TOKEN)"
    ```
 
 4. **Cloud Build Configuration**
-   The `cloudbuild.yaml` configures:
-   - VLLM Docker image build
-   - Hugging Face model caching
-   - High-performance inference settings
-   ```yaml
-   steps:
-     - name: "gcr.io/cloud-builders/docker"
-       args:
-         - build
-         - --build-arg
-         - HF_TOKEN=${_HF_TOKEN}
-         - --tag=${_IMAGE}
-         - .
+   First, create a secret for your Hugging Face token:
+   ```bash
+   # Create a secret for HF token
+   echo -n "your_huggingface_token" | gcloud secrets create HF_TOKEN --data-file=-
    
-   substitutions:
-     _IMAGE: "us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-gemma-2b-it-repo/vllm-gemma-2b-it"
-   
-   options:
-     machineType: "E2_HIGHCPU_32"
+   # Grant Cloud Build access to the secret
+   gcloud secrets add-iam-policy-binding HF_TOKEN \
+     --member="serviceAccount:YOUR_PROJECT_NUMBER@cloudbuild.gserviceaccount.com" \
+     --role="roles/secretmanager.secretAccessor"
    ```
 
 5. **Accessing the Inference Server**
