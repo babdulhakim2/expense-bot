@@ -2,12 +2,17 @@
 
 import { motion } from 'framer-motion';
 import Image from 'next/image';
+import { AuthenticatedView } from './authenticated-view';
 
 interface HeroSectionProps {
   isAuthenticated?: boolean;
 }
 
 export function HeroSection({ isAuthenticated }: HeroSectionProps) {
+  if (isAuthenticated) {
+    return <AuthenticatedView />;
+  }
+
   return (
     <div className="flex flex-col items-center text-center space-y-8">
       <motion.div
@@ -43,21 +48,10 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
         transition={{ delay: 0.2, duration: 0.5 }}
       >
         <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
-          {isAuthenticated ? (
-            <>
-              Welcome Back to
-              <motion.span className="text-primary block">
-                ExpenseBot
-              </motion.span>
-            </>
-          ) : (
-            <>
-              Your AI-Powered
-              <motion.span className="text-primary block">
-                Bookkeeping Assistant
-              </motion.span>
-            </>
-          )}
+          Your AI-Powered
+          <motion.span className="text-primary block">
+            Bookkeeping Assistant
+          </motion.span>
         </h1>
       </motion.div>
 
@@ -67,9 +61,7 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
         transition={{ delay: 0.6, duration: 0.5 }}
         className="text-xl text-muted-foreground max-w-2xl"
       >
-        {isAuthenticated 
-          ? "Continue managing your expenses with AI-powered assistance."
-          : "Simplify your bookkeeping with ExpenseBot. Just send your receipts via WhatsApp, and let AI handle the rest."}
+        Simplify your bookkeeping with ExpenseBot. Just send your receipts via WhatsApp, and let AI handle the rest.
       </motion.p>
     </div>
   );

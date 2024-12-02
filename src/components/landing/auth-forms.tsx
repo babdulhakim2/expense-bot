@@ -5,11 +5,10 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { auth } from '@/lib/firebase';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
-import { ArrowRight, Flag, LogOut } from 'lucide-react';
-import { signIn, signOut } from 'next-auth/react';
+import { ArrowRight, Flag } from 'lucide-react';
+import { signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import React, { FormEvent, useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
 
 declare global {
   interface Window {
@@ -122,28 +121,7 @@ export function AuthForms() {
   // Now we can have conditional renders
   if (session) {
     return (
-      <div className="flex flex-col items-center justify-center w-full mt-8 space-y-6">
-        <p className="text-xl text-muted-foreground">
-          Welcome back! 👋
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Button 
-            size="lg"
-            onClick={() => router.push('/dashboard')}
-            className="min-w-[200px]"
-          >
-            Go to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-          <Button 
-            size="lg"
-            variant="outline"
-            onClick={() => signOut({ callbackUrl: '/' })}
-            className="min-w-[200px]"
-          >
-            Sign Out <LogOut className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+      null
     );
   }
 
