@@ -45,13 +45,13 @@ export function PoweredBySection() {
           >
             <Brain className="w-4 h-4 text-secondary-foreground" />
             <span className="font-semibold bg-gradient-to-r from-secondary-foreground to-secondary-foreground/70 bg-clip-text text-transparent">
-              PalliGemma
+              PaliGemma
             </span>
           </motion.a>
         </div>
         
         <p className="text-sm text-muted-foreground max-w-md text-center">
-          Leveraging Google's advanced AI models for intelligent receipt processing and analysis
+          Leveraging Google's Open weights models for intelligent receipt processing and analysis
         </p>
       </div>
     </motion.div>

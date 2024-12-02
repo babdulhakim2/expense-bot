@@ -21,8 +21,8 @@ export default function RootLayout({
       <body className={inter.className}>
         <NextAuthProvider>
           {children}
+          <Toaster />
         </NextAuthProvider>
-        <Toaster />
       </body>
     </html>
   );

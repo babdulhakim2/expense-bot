@@ -334,7 +334,7 @@ export function AuthForms() {
 
       // Get the callback URL from the query parameters or use default
       const urlParams = new URLSearchParams(window.location.search);
-      const callbackUrl = urlParams.get('callbackUrl') || '/dashboard';
+      const callbackUrl =  '/';
 
       const response = await signIn('credentials', {
         token: idToken,
@@ -352,7 +352,8 @@ export function AuthForms() {
       });
 
       // Use router.replace instead of push to avoid the URL issue
-      router.replace('/dashboard');
+    //   router.replace('/dashboard');
+    window.location.href = '/dashboard';
     } catch (error: any) {
       console.error('Error verifying code:', error);
       const errorMessage = error.code === 'auth/invalid-verification-code' 
