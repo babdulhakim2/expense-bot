@@ -126,3 +126,78 @@ class Gemma2Service:
         except Exception as e:
             logger.error(f"Error validating transaction: {str(e)}")
             return False
+
+    def extract_transaction(self, message: str) -> tuple[bool, dict, str]:
+        """Extract transaction details from text message."""
+        try:
+            logger.info("Processing text message with Gemma")
+            today = datetime.now()
+            
+            prompt = f"""Extract transaction details from this message.
+            Today's date is {today.strftime('%Y-%m-%d')}.
+            Message: {message}
+
+            Return a JSON object with EXACTLY these fields:
+            {{
+                "transaction_date": "{today.strftime('%Y-%m-%d')}" (or date from message),
+                "amount": numeric value (no currency symbols),
+                "currency": "GBP" (or currency mentioned),
+                "description": what was purchased/paid for,
+                "transaction_type": "Expense",
+                "category": category based on description,
+                "payment_method": payment method if mentioned or "Card",
+                "merchant": vendor name if mentioned
+            }}"""
+
+            # Prepare the request payload
+            payload = {
+                "prompt": prompt,
+                "temperature": 0.1,
+                "response_format": "json"
+            }
+
+            # Make API request
+            response = requests.post(
+                self.api_endpoint,
+                headers=self.headers,
+                json=payload
+            )
+
+            if response.status_code != 200:
+                logger.error(f"API request failed: {response.status_code} - {response.text}")
+                return False, {}, "Failed to process message with Gemma API"
+
+            transaction_data = response.json()
+            
+            if self.is_valid_transaction(transaction_data):
+                logger.info("Successfully extracted transaction data")
+                return True, transaction_data, "Transaction processed successfully"
+            else:
+                logger.warning("Invalid transaction data received")
+                return False, {}, "Could not extract transaction details from message."
+
+        except Exception as e:
+            logger.error(f"Error processing message: {str(e)}", exc_info=True)
+            return False, {}, "Sorry, I had trouble processing your message. Please try again."
+
+    def process_media(self, media_content: bytes, media_type: str, message: str = "") -> tuple[bool, dict, str]:
+        """Process media content using Gemma API."""
+        try:
+            logger.info("Processing media with Gemma")
+            
+            # Convert media content to PIL Image
+            try:
+                image = Image.open(io.BytesIO(media_content))
+                # Convert to RGB if needed
+                if image.mode != 'RGB':
+                    image = image.convert('RGB')
+            except Exception as e:
+                logger.error(f"Failed to process image: {str(e)}")
+                return False, {}, "Could not process the image. Please try again."
+
+            # Use existing process_receipt_image method
+            return self.process_receipt_image(image, message)
+
+        except Exception as e:
+            logger.error(f"Error in process_media: {str(e)}", exc_info=True)
+            return False, {}, "Failed to process media content"

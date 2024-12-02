@@ -9,18 +9,21 @@ declare module "next-auth" {
     user: {
       id: string;
       phoneNumber?: string | null;
+      idToken?: string;
     }
   }
   
   interface User {
     id: string;
     phoneNumber?: string | null;
+    idToken?: string;
   }
 }
 
 interface Token {
   id?: string;
   phoneNumber?: string | null;
+  idToken?: string;
 }
 
 const verifyToken = async (token: string): Promise<DecodedIdToken | null> => {
@@ -70,6 +73,7 @@ export const authOptions: NextAuthOptions = {
           return {
             id: decodedToken.user_id,
             phoneNumber: decodedToken.phone_number || null,
+            idToken: credentials.token,
           };
           
         } catch (error) {
@@ -88,6 +92,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.phoneNumber = user.phoneNumber || undefined;
+        token.idToken = user.idToken;
       }
       return token;
     },
@@ -95,6 +100,7 @@ export const authOptions: NextAuthOptions = {
       if (session?.user) {
         session.user.id = token.id as string;
         session.user.phoneNumber = token.phoneNumber as string | null;
+        session.user.idToken = token.idToken as string;
       }
       return session;
     },

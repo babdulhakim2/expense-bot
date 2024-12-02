@@ -27,11 +27,6 @@ import json
 
 load_dotenv()  # take environment variables from .env.
 
-# Initialize wandb with API key before using weave
-# wandb.login(key=os.getenv('WANDB_API_KEY'))
-
-# # Then initialize weave
-# weave.init(project_name="expense-bot")
 
 # Set up logging configuration at the top of the file after imports
 logging.basicConfig(
@@ -192,21 +187,99 @@ def get_or_create_user_folder(phone_number):
         logger.error(f"Failed to manage user folder: {str(e)}")
         raise e
 
-def get_or_create_spreadsheet(phone_number):
+def get_or_create_monthly_folder(phone_number, date):
+    """Get or create a folder for the specific month and year."""
     try:
-        folder_id = get_or_create_user_folder(phone_number)
+        folder_name = f"Expenses_{phone_number}_{date.strftime('%B_%Y')}"
+        
+        # Check if folder exists in Firestore
+        folder_doc = db.collection('folders').document(f"{phone_number}_{date.strftime('%B_%Y')}")
+        folder = folder_doc.get()
+        
+        if folder.exists:
+            folder_id = folder.to_dict().get('folder_id')
+            logger.info(f"Found existing folder: {folder_id}")
+            return folder_id
+            
+        # Create new folder in Google Drive
+        folder_metadata = {
+            'name': folder_name,
+            'mimeType': 'application/vnd.google-apps.folder'
+        }
+        
+        drive_folder = drive_service.files().create(
+            body=folder_metadata,
+            fields='id'
+        ).execute()
+        
+        folder_id = drive_folder.get('id')
+        
+        # Share folder with user
+        user_doc = db.collection('users').document(phone_number).get()
+        user_email = user_doc.to_dict().get('email') if user_doc.exists else os.environ.get('DEFAULT_USER_EMAIL')
+        
+        permission = {
+            'type': 'user',
+            'role': 'writer',
+            'emailAddress': user_email
+        }
+        
+        drive_service.permissions().create(
+            fileId=folder_id,
+            body=permission,
+            sendNotificationEmail=False
+        ).execute()
+        
+        # Store folder info in Firestore
+        folder_doc.set({
+            'folder_id': folder_id,
+            'created_at': firestore.SERVER_TIMESTAMP,
+            'month_year': date.strftime('%B_%Y'),
+            'user_email': user_email
+        })
+        
+        logger.info(f"Created new folder: {folder_id}")
+        return folder_id
+        
+    except Exception as e:
+        logger.error(f"Error in get_or_create_monthly_folder: {str(e)}")
+        raise
+
+def get_folder_url(phone_number, date):
+    """Get the URL for the monthly folder."""
+    try:
+        folder_doc = db.collection('folders').document(f"{phone_number}_{date.strftime('%B_%Y')}")
+        folder = folder_doc.get()
+        
+        if folder.exists:
+            folder_id = folder.to_dict().get('folder_id')
+            return f"https://drive.google.com/drive/folders/{folder_id}"
+            
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error getting folder URL: {str(e)}")
+        return None
+
+def get_or_create_spreadsheet(phone_number, date):
+    """Get or create spreadsheet in the monthly folder."""
+    try:
+        folder_id = get_or_create_monthly_folder(phone_number, date)
+        spreadsheet_name = f'Expenses_{phone_number}_{date.strftime("%B_%Y")}'
+        
         try:
-            spreadsheet = sheets_client.open(f'Expenses_{phone_number}')
+            spreadsheet = sheets_client.open(spreadsheet_name)
         except gspread.SpreadsheetNotFound:
-            spreadsheet = sheets_client.create(f'Expenses_{phone_number}')
-            # Move to user's folder
+            spreadsheet = sheets_client.create(spreadsheet_name)
+            
+            # Move to monthly folder
             file_id = spreadsheet.id
-            # Get the file's current parents
             file = drive_service.files().get(
                 fileId=file_id,
                 fields='parents'
             ).execute()
             previous_parents = ",".join(file.get('parents', []))
+            
             # Move the file to the new folder
             drive_service.files().update(
                 fileId=file_id,
@@ -216,15 +289,18 @@ def get_or_create_spreadsheet(phone_number):
             ).execute()
         
         # Share with user's email
-        email = "abdulhakim.gafai@gmail.com"
+        user_doc = db.collection('users').document(phone_number).get()
+        email = user_doc.to_dict().get('email') if user_doc.exists else os.environ.get('DEFAULT_USER_EMAIL')
+        
         permissions = spreadsheet.list_permissions()
         if not any(p.get('emailAddress') == email for p in permissions):
             spreadsheet.share(email, perm_type='user', role='writer', notify=False)
         
         return spreadsheet
+        
     except Exception as e:
         logger.error(f"Error in get_or_create_spreadsheet: {str(e)}")
-        raise e
+        raise
 
 def get_or_create_worksheet(spreadsheet, worksheet_name):
     try:
@@ -250,7 +326,7 @@ def get_or_create_worksheet(spreadsheet, worksheet_name):
 
 def update_expense_sheet(date, amount, item, phone_number):
     try:
-        spreadsheet = get_or_create_spreadsheet(phone_number)
+        spreadsheet = get_or_create_spreadsheet(phone_number, date)
         worksheet_name = date.strftime('%B %Y')
         worksheet = get_or_create_worksheet(spreadsheet, worksheet_name)
         
@@ -306,24 +382,6 @@ def parse_expense_text(text):
 
     return datetime.strptime(date_str, '%Y-%m-%d'), float(amount_str), item
 
-def get_folder_url(phone_number):
-    try:
-        conn = sqlite3.connect('expenses.db')
-        c = conn.cursor()
-        c.execute('SELECT folder_id FROM users WHERE phone_number = ?', (phone_number,))
-        result = c.fetchone()
-        
-        if result:
-            folder_id = result[0]
-            folder_url = f"https://drive.google.com/drive/folders/{folder_id}"
-            return folder_url
-        return None
-    except Exception as e:
-        logger.error(f"Error getting folder URL: {str(e)}")
-        return None
-    finally:
-        conn.close()
-
 @app.route('/whatsapp', methods=['POST'])
 def whatsapp():
     try:
@@ -340,37 +398,52 @@ def whatsapp():
 
         if num_media > 0:
             # Process media message
-            media_url = request.values.get('MediaUrl0')
-            media_type = request.values.get('MediaContentType0')
-            
-            logger.info(f"Processing media: {media_type} from {media_url}")
-            
-            # Download media content
-            media_response = requests.get(media_url)
-            if media_response.status_code != 200:
-                logger.error(f"Failed to download media: {media_response.status_code}")
-                msg.body("Sorry, I couldn't download the file. Please try again.")
-                return str(resp)
+            try:
+                media_url = request.values.get('MediaUrl0')
+                media_type = request.values.get('MediaContentType0')
                 
-            # Try Gemma first
-            is_transaction, transaction, response = gemma2_service.process_media(
-                media_response.content,
-                media_type,
-                incoming_msg
-            )
-            
-            # Fall back to Gemini if Gemma fails
-            if not is_transaction:
-                logger.info("Gemma processing failed, falling back to Gemini")
-                is_transaction, transaction, response = gemini_service.process_media(
-                    media_response.content,
-                    media_type,
-                    incoming_msg
-                )
-            
+                logger.info(f"Processing media: {media_type} from {media_url}")
+                
+                # Download media content
+                media_response = requests.get(media_url)
+                if media_response.status_code != 200:
+                    logger.error(f"Failed to download media: {media_response.status_code}")
+                    msg.body("Sorry, I couldn't download the file. Please try again.")
+                    return str(resp)
+                    
+                # Try Gemma first
+                try:
+                    is_transaction, transaction, response = gemma2_service.process_media(
+                        media_response.content,
+                        media_type,
+                        incoming_msg
+                    )
+                except Exception as e:
+                    logger.error(f"Gemma media processing failed: {str(e)}")
+                    is_transaction = False
+                    response = str(e)
+                
+                # Fall back to Gemini if Gemma fails
+                if not is_transaction:
+                    logger.info("Gemma processing failed, falling back to Gemini")
+                    is_transaction, transaction, response = gemini_service.process_media(
+                        media_response.content,
+                        media_type,
+                        incoming_msg
+                    )
+                    
+            except Exception as e:
+                logger.error(f"Error processing media: {str(e)}", exc_info=True)
+                msg.body("Sorry, I had trouble processing your image. Please try again.")
+                return str(resp)
+        
         else:
             # Try Gemma first for text processing
-            is_transaction, transaction, response = gemma2_service.extract_transaction(incoming_msg)
+            try:
+                is_transaction, transaction, response = gemma2_service.extract_transaction(incoming_msg)
+            except Exception as e:
+                logger.error(f"Gemma text processing failed: {str(e)}")
+                is_transaction = False
             
             # Fall back to Gemini if Gemma fails
             if not is_transaction:
@@ -396,7 +469,9 @@ def whatsapp():
             phone_number
         )
         
-        folder_url = get_folder_url(phone_number)
+        # Get folder URL using transaction date
+        transaction_date = datetime.strptime(transaction['transaction_date'], '%Y-%m-%d')
+        folder_url = get_folder_url(phone_number, transaction_date)
         
         # Format success response with currency information
         response_text = (

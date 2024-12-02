@@ -352,7 +352,6 @@ export function AuthForms() {
       });
 
       router.replace('/dashboard');
-    // window.location.href = '/dashboard';
     } catch (error: any) {
       console.error('Error verifying code:', error);
       const errorMessage = error.code === 'auth/invalid-verification-code' 
