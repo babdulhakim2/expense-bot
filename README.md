@@ -6,6 +6,11 @@ ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that automatic
 
 ## How It Works
 
+<div align="center">
+  <img src="/public/app-flow.png" alt="ExpenseBot Process Flow" width="800"/>
+  <p><em>ExpenseBot's Receipt Processing Workflow</em></p>
+</div>
+
 1. **Receipt Processing**
    - Send receipts via WhatsApp
    - AI extracts key information (amount, date, items, merchant)
