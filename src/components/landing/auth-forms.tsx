@@ -9,7 +9,9 @@ import { ArrowRight, Flag } from 'lucide-react';
 import { signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import React, { FormEvent, useEffect, useState } from 'react';
-
+import { PhoneNumberInput } from '@/components/shared/phone-input';
+import { isValidPhoneNumber } from 'react-phone-number-input';
+// import 'react-phone-number-input/style.css';
 declare global {
   interface Window {
     recaptchaVerifier: RecaptchaVerifier;
@@ -186,11 +188,8 @@ export function AuthForms() {
   
 
   const formatPhoneNumber = (number: string): string => {
-    let cleaned = number.replace(/[^\d+]/g, '');
-    if (!cleaned.startsWith('+')) {
-      cleaned = '+44' + cleaned;
-    }
-    return cleaned;
+    // The phone number is already in E.164 format from the PhoneInput
+    return number;
   };
 
   const formatPhoneDisplay = (input: string): string => {
@@ -208,7 +207,7 @@ export function AuthForms() {
   const handlePhoneSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
-    // Check if there's a stored cooldown in localStorage
+    // Check if there's a stored cooldown
     const storedCooldown = localStorage.getItem('phoneAuthCooldown');
     if (storedCooldown) {
       const cooldownTimestamp = parseInt(storedCooldown);
@@ -225,28 +224,22 @@ export function AuthForms() {
       }
     }
 
+    // Validate phone number
+    if (!isValidPhoneNumber(phone)) {
+      toast({
+        title: "Invalid Phone Number",
+        description: "Please enter a valid UK or US phone number",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
-      const formattedPhone = formatPhoneNumber(phone);
-      if (formattedPhone.length < 8) {
-        throw new Error('Please enter a valid phone number');
-      }
-
-      // Clean up any existing reCAPTCHA verifier
-      if (window.recaptchaVerifier) {
-        try {
-          await window.recaptchaVerifier.clear();
-          window.recaptchaVerifier = undefined as unknown as RecaptchaVerifier;
-        } catch (error) {
-          console.error('Error clearing reCAPTCHA:', error);
-        }
-      }
-
-      // Remove any existing reCAPTCHA iframes
-      const iframes = document.querySelectorAll('iframe[src*="recaptcha"]');
-      iframes.forEach(iframe => iframe.remove());
+      // The phone number is already in E.164 format
+      const formattedPhone = phone;
 
       await initializeRecaptcha();
       
@@ -351,7 +344,8 @@ export function AuthForms() {
         description: "Phone number verified successfully!",
       });
 
-      router.replace('/dashboard');
+      // Don't redirect - let the AuthenticatedView handle it
+      // The AuthenticatedView will show onboarding for new users
     } catch (error: any) {
       console.error('Error verifying code:', error);
       const errorMessage = error.code === 'auth/invalid-verification-code' 
@@ -389,38 +383,37 @@ export function AuthForms() {
     <div className="flex flex-col items-center justify-center w-full mt-8">
       {step === 1 && (
         <form onSubmit={handlePhoneSubmit} className="w-full max-w-md space-y-4 mx-auto">
-          <div className="flex space-x-2">
-            <div className="relative flex-1">
-              <div className="absolute left-3 top-2.5 flex items-center gap-1.5">
-                <Flag className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium text-muted-foreground">+44</span>
-              </div>
-              <Input
-                type="tel"
-                placeholder="7911 123456"
-                className="pl-20"
-                value={formatPhoneDisplay(phone)}
-                onChange={handlePhoneChange}
-                disabled={loading}
-                maxLength={13} // Accounts for spaces in formatting
-              />
-            </div>
-            <Button 
-              type="submit" 
-              disabled={loading || (cooldownTime ? Date.now() < cooldownTime : undefined)}
-              className="min-w-[120px]"
-            >
-              {loading ? (
-                "Sending..."
-              ) : cooldownTime ? (
-                `Wait ${formatTimeRemaining(cooldownTime - Date.now())}`
-              ) : (
-                <>
-                  Get Started <ArrowRight className="ml-2 h-4 w-4" />
-                </>
-              )}
-            </Button>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">
+              Phone Number
+            </label>
+            <PhoneNumberInput
+              value={phone}
+              onChange={setPhone}
+              disabled={loading}
+              error={!!error}
+            />
+            <p className="text-sm text-muted-foreground">
+              Enter your UK or US phone number to receive a verification code
+            </p>
           </div>
+          
+          <Button 
+            type="submit" 
+            disabled={loading || !phone || !isValidPhoneNumber(phone) || (cooldownTime ? Date.now() < cooldownTime : false)}
+            className="w-full"
+          >
+            {loading ? (
+              "Sending..."
+            ) : cooldownTime ? (
+              `Wait ${formatTimeRemaining(cooldownTime - Date.now())}`
+            ) : (
+              <>
+                Get Code <ArrowRight className="ml-2 h-4 w-4" />
+              </>
+            )}
+          </Button>
+
           <div id="recaptcha-container" className="flex justify-center"></div>
           {error && (
             <p className="text-sm text-destructive">{error}</p>
