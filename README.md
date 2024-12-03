@@ -95,12 +95,4 @@ The receipt processing model was fine-tuned on:
    - App Engine for webhook
    - Cloud Build for AI inference
 
-## Contributing
 
-Contributions welcome! Please read:
-1. [Contributing Guidelines](CONTRIBUTING.md)
-2. [Server Development Guide](src/server/README.md)
-
-## License
-
-MIT License - see [LICENSE](LICENSE)
