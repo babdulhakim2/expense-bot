@@ -1,11 +1,8 @@
 'use client';
 
-import { 
-  Building2Icon, 
-  CreditCardIcon, 
-  FileSpreadsheetIcon,
-  FolderIcon,
-  UsersIcon
+import {
+    FileSpreadsheetIcon,
+    FolderIcon
 } from "lucide-react";
 
 export function BusinessSettings() {
