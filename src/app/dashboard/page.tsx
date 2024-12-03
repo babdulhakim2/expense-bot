@@ -1,14 +1,13 @@
-import { authOptions } from "@/lib/auth";
-import { getServerSession } from "next-auth/next";
-import { redirect } from "next/navigation";
-import DashboardClient from "./dashboard-client";
+import { DashboardHeader } from "@/components/dashboard/layout/header";
+import { DashboardOverview } from "@/components/dashboard/overview/dashboard-overview";
 
-export default async function DashboardPage() {
-  const session = await getServerSession(authOptions);
-
-  if (!session) {
-    redirect("/");
-  }
-
-  return <DashboardClient session={session} />;
+export default function DashboardPage() {
+  return (
+    <>
+      <DashboardHeader />
+      <main className="flex-1 overflow-y-auto">
+        <DashboardOverview />
+      </main>
+    </>
+  );
 }

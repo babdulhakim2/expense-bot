@@ -14,7 +14,7 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
   }
 
   return (
-    <div className="flex flex-col items-center text-center space-y-8">
+    <div className="flex flex-col items-center text-center space-y-3">
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
