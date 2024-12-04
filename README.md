@@ -34,7 +34,6 @@ ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that automatic
 - **AI/ML**: 
   - Gemma 2B (VLLM inference server)
   - [PaliGemma Fine-tuned](https://huggingface.co/superfunguy/palligemma-receipts-Gemma2-challenge/tree/main)
-  - Gemini Pro (fallback model)
 - **Infrastructure**: 
   - Firebase (Auth, Firestore)
   - Google Cloud (App Engine, Cloud Build)

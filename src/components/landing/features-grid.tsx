@@ -13,7 +13,7 @@ const features = [
   {
     icon: <Shield className="w-10 h-10 text-primary mb-4" />,
     title: "Secure & Private",
-    description: "Your financial data is encrypted and protected. We prioritize your privacy and security."
+    description: "Your financial data within your control. Deploy directly to your cloud or run on-premise."
   },
   {
     icon: <Sparkles className="w-10 h-10 text-primary mb-4" />,
