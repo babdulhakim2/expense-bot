@@ -49,6 +49,16 @@ def whatsapp():
         phone_number = user_id.replace('whatsapp:', '')
         logger.info(f"Received message from {phone_number}: {incoming_msg}")
         
+        # Store incoming message immediately
+        incoming_message = {
+            'direction': 'inbound',
+            'phone_number': phone_number,
+            'content': incoming_msg,
+            'type': 'text' if num_media == 0 else 'media',
+            'platform': 'whatsapp',
+            'timestamp': datetime.now().isoformat()
+        }
+        
         resp = MessagingResponse()
         msg = resp.message()
 
@@ -63,6 +73,13 @@ def whatsapp():
                 f"Please create an account at:\n{registration_url}\n\n"
                 "Once registered, you can start tracking your expenses!"
             )
+            
+            # Store unregistered user message
+            # firebase_service.store_message(
+            #     user_id='system',
+            #     business_id='registration',
+            #     message_data=incoming_message
+            # )
             return str(resp)
 
         # Get or create active business for user
@@ -70,6 +87,17 @@ def whatsapp():
         if not business:
             msg.body("Sorry, there was an error accessing your business account. Please try again later.")
             return str(resp)
+
+        # Store the incoming message with user context
+        stored_message = firebase_service.store_message(
+            user_id=user['id'],
+            business_id=business['id'],
+            message_data={
+                **incoming_message,
+                'user_id': user['id'],
+                'business_id': business['id']
+            }
+        )
 
         if num_media > 0:
             # Process media message
@@ -81,11 +109,18 @@ def whatsapp():
                 
                 # Download media content
                 media_response = requests.get(media_url)
-                if media_response.status_code != 200:
-                    logger.error(f"Failed to download media: {media_response.status_code}")
-                    msg.body("Sorry, I couldn't download the file. Please try again.")
-                    return str(resp)
-                    
+                if media_response.status_code == 200:
+                    # Store media content in Firebase Storage
+                    firebase_service.store_message(
+                        user_id=user['id'],
+                        business_id=business['id'],
+                        message_data={
+                            **stored_message,
+                            'media_content': media_response.content,
+                            'media_type': media_type
+                        }
+                    )
+
                 # Try Gemma first
                 try:
                     is_transaction, transaction, response = gemma2_service.process_media(
@@ -127,6 +162,18 @@ def whatsapp():
         
         if not is_transaction:
             msg.body(response)
+            # Store AI response
+            firebase_service.store_message(
+                user_id=user['id'],
+                business_id=business['id'],
+                message_data={
+                    'direction': 'outbound',
+                    'content': response,
+                    'type': 'ai_response',
+                    'related_message_id': stored_message['id'],
+                    'timestamp': datetime.now().isoformat()
+                }
+            )
             return str(resp)
 
         # Get or create monthly folder
@@ -211,13 +258,46 @@ def whatsapp():
                 f"{monthly_folder['spreadsheet']['url']}\n\n"
             )
         
+        # Store the final response message
+        firebase_service.store_message(
+            user_id=user['id'],
+            business_id=business['id'],
+            message_data={
+                'direction': 'outbound',
+                'content': response_text,
+                'type': 'transaction_confirmation',
+                'related_message_id': stored_message['id'],
+                'transaction_data': transaction,
+                'expense_id': expense['id'],
+                'folder_id': monthly_folder['id'],
+                'spreadsheet_id': monthly_folder.get('spreadsheet', {}).get('id'),
+                'timestamp': datetime.now().isoformat()
+            }
+        )
+
         msg.body(response_text)
         return str(resp)
         
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}", exc_info=True)
+        error_msg = "Sorry, something went wrong. Please try again."
+        
+        # Store error message if we have user context
+        if 'user' in locals() and 'business' in locals():
+            firebase_service.store_message(
+                user_id=user['id'],
+                business_id=business['id'],
+                message_data={
+                    'direction': 'outbound',
+                    'content': error_msg,
+                    'type': 'error',
+                    'error_details': str(e),
+                    'timestamp': datetime.now().isoformat()
+                }
+            )
+        
         msg = MessagingResponse().message()
-        msg.body("Sorry, something went wrong. Please try again.")
+        msg.body(error_msg)
         return str(msg)
 
 wandb_enabled = False  # Global flag
