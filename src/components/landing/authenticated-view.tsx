@@ -9,8 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useBusiness } from '@/contexts/business-context';
 import { toast } from "@/hooks/use-toast";
 import { BUSINESS_CATEGORIES } from "@/lib/constants/business-categories";
-import { db } from "@/lib/firebase";
-import { collection, doc, getDoc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase/firebase";
+import { BusinessService } from '@/lib/firebase/services/business-service';
+import { UserService } from '@/lib/firebase/services/user-service';
+import { doc, getDoc } from "firebase/firestore";
 import { motion } from "framer-motion";
 import { LogOut } from "lucide-react";
 import { signOut, useSession } from 'next-auth/react';
@@ -75,32 +77,21 @@ export function AuthenticatedView() {
 
     try {
       // Create user profile
-      const userRef = doc(db, 'users', session.user.id);
-      await setDoc(userRef, {
+      await UserService.createOrUpdateUser({
         id: session.user.id,
         name: formData.name,
         email: formData.email,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       });
 
-      // Create business and update context
-      const businessRef = doc(collection(db, 'businesses'));
-      const businessData = {
-        id: businessRef.id,
+      // Create business
+      const businessData = await BusinessService.createBusiness(session.user.id, {
         name: formData.businessName,
         type: formData.businessType,
-        ownerId: session.user.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      });
       
-      await setDoc(businessRef, businessData);
-      
-      // Update business context
       setCurrentBusiness(businessData);
-
       setShowOnboarding(false);
+      
       toast({
         title: "Success",
         description: "Profile and business created successfully",

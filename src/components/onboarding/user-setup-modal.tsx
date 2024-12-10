@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
-import { doc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
+import { db } from '@/lib/firebase/firebase';
+import { collection, doc, setDoc } from 'firebase/firestore';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
 type SetupStep = 'profile' | 'business';
 
@@ -79,29 +79,21 @@ export function UserSetupModal() {
     setIsSubmitting(true);
 
     try {
-      // Create business document in Firestore
-      const businessRef = doc(db, 'businesses', `${Date.now()}`);
+      // Create business in user's subcollection
+      const businessRef = doc(collection(db, 'users', session?.user?.id || '', 'businesses'));
       await setDoc(businessRef, {
+        id: businessRef.id,
         name: business.name,
         type: business.type,
-        ownerId: session?.user?.id,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-
-      // Add business reference to user
-      const userRef = doc(db, 'users', session?.user?.id || '');
-      await setDoc(userRef, {
-        businesses: [businessRef.id],
-        updatedAt: new Date(),
-      }, { merge: true });
 
       toast({
         title: 'Success',
         description: 'Your profile has been set up successfully!',
       });
 
-      // Redirect to dashboard
       router.push('/dashboard');
     } catch (error) {
       console.error('Error saving business:', error);

@@ -1,15 +1,14 @@
 "use client";
 
+import { PhoneNumberInput } from '@/components/shared/phone-input';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { auth } from '@/lib/firebase';
+import { auth } from '@/lib/firebase/firebase';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
-import { ArrowRight, Flag } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import React, { FormEvent, useEffect, useState } from 'react';
-import { PhoneNumberInput } from '@/components/shared/phone-input';
 import { isValidPhoneNumber } from 'react-phone-number-input';
 // import 'react-phone-number-input/style.css';
 declare global {

@@ -1,18 +1,8 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect } from 'react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { BusinessService, type Business } from '@/lib/firebase/services/business-service';
 import { useSession } from 'next-auth/react';
-
-type Business = {
-  id: string;
-  name: string;
-  type: string;
-  ownerId: string;
-  createdAt: Date;
-  updatedAt: Date;
-};
+import { createContext, useContext, useEffect, useState } from 'react';
 
 type BusinessContextType = {
   currentBusiness: Business | null;
@@ -25,16 +15,6 @@ type BusinessContextType = {
 
 const BusinessContext = createContext<BusinessContextType | undefined>(undefined);
 
-// Temporary mock data until API is ready
-const MOCK_BUSINESSES = [
-  {
-    id: '1',
-    name: 'Default Business',
-    type: 'small_business',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }
-];
 
 export function BusinessProvider({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession();
@@ -48,20 +28,9 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
 
       try {
         setIsLoading(true);
-        // Query businesses for current user
-        const businessesRef = collection(db, 'businesses');
-        const q = query(businessesRef, where('ownerId', '==', session.user.id));
-        const querySnapshot = await getDocs(q);
-        
-        const userBusinesses = querySnapshot.docs.map(doc => ({
-          ...doc.data(),
-          createdAt: doc.data().createdAt.toDate(),
-          updatedAt: doc.data().updatedAt.toDate(),
-        })) as Business[];
-
+        const userBusinesses = await BusinessService.getUserBusinesses(session.user.id);
         setBusinesses(userBusinesses);
         
-        // Set first business as current if none selected
         if (!currentBusiness && userBusinesses.length > 0) {
           setCurrentBusiness(userBusinesses[0]);
         }
