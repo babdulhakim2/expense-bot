@@ -6,13 +6,15 @@ import { useBusiness } from "@/contexts/business-context";
 import { BUSINESS_CATEGORIES } from "@/lib/constants/business-categories";
 import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
+import { useSession } from "next-auth/react";
 
 export function BusinessSwitcher() {
   const router = useRouter();
+  const { data: session } = useSession();
   const { businesses, currentBusiness, setCurrentBusiness, isLoading } = useBusiness();
   const [isOpen, setIsOpen] = useState(false);
 
-  if (isLoading) {
+  if (isLoading || !session?.user) {
     return (
       <div className="flex items-center gap-2 px-4 py-2 animate-pulse">
         <div className="h-5 w-5 bg-gray-700 rounded" />
@@ -24,19 +26,29 @@ export function BusinessSwitcher() {
     );
   }
 
-  const handleBusinessSwitch = (business: typeof currentBusiness) => {
-    if (!business) return;
-    setCurrentBusiness(business);
-    setIsOpen(false);
+  const handleBusinessSwitch = async (business: typeof currentBusiness) => {
+    if (!business || !session?.user?.id) return;
     
-    toast({
-      title: "Business Switched",
-      description: `Switched to ${business.name}`,
-    });
+    try {
+      setCurrentBusiness(business);
+      setIsOpen(false);
+      
+      toast({
+        title: "Business Switched",
+        description: `Switched to ${business.name}`,
+      });
+    } catch (error) {
+      console.error('Error switching business:', error);
+      toast({
+        title: "Error",
+        description: "Failed to switch business",
+        variant: "destructive",
+      });
+    }
   };
 
   const getBusinessCategory = (type: string) => {
-    return BUSINESS_CATEGORIES.find(cat => cat.id === type) || BUSINESS_CATEGORIES[9];
+    return BUSINESS_CATEGORIES.find(cat => cat.id === type) || BUSINESS_CATEGORIES[0];
   };
 
   return (
@@ -47,7 +59,7 @@ export function BusinessSwitcher() {
       >
         <Building2Icon className="h-5 w-5" />
         <div className="flex-1 min-w-0">
-          <p className="font-medium">{currentBusiness?.name || 'Select Business'}</p>
+          <p className="font-medium truncate">{currentBusiness?.name || 'Select Business'}</p>
           {currentBusiness && (
             <p className="text-xs text-gray-400 flex items-center gap-1">
               <span className="inline-block w-4">{getBusinessCategory(currentBusiness.type).icon}</span>
@@ -75,8 +87,8 @@ export function BusinessSwitcher() {
                     {getBusinessCategory(business.type).icon}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium">{business.name}</p>
-                    <p className="text-xs text-gray-400">
+                    <p className="font-medium truncate">{business.name}</p>
+                    <p className="text-xs text-gray-400 truncate">
                       {getBusinessCategory(business.type).label}
                     </p>
                   </div>

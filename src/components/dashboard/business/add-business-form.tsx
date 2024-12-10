@@ -1,17 +1,16 @@
 'use client';
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BUSINESS_CATEGORIES } from "@/lib/constants/business-categories";
 import { useBusiness } from "@/contexts/business-context";
-import { doc, collection, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { useSession } from "next-auth/react";
 import { toast } from "@/hooks/use-toast";
+import { BUSINESS_CATEGORIES } from "@/lib/constants/business-categories";
+import { BusinessService } from '@/lib/firebase/services/business-service';
+import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 interface FormData {
   name: string;
@@ -34,19 +33,11 @@ export function AddBusinessForm() {
     
     setLoading(true);
     try {
-      const businessRef = doc(collection(db, 'businesses'));
-      const businessData = {
-        id: businessRef.id,
+      const businessData = await BusinessService.createBusiness(session.user.id, {
         name: formData.name,
         type: formData.type,
-        ownerId: session.user.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      await setDoc(businessRef, businessData);
+      });
       
-      // Update both current business and businesses list
       setCurrentBusiness(businessData);
       setBusinesses([...businesses, businessData]);
 
@@ -55,7 +46,6 @@ export function AddBusinessForm() {
         description: "Business created successfully",
       });
 
-      // Small delay to show the toast before redirecting
       setTimeout(() => {
         router.push('/dashboard');
       }, 500);

@@ -35,6 +35,18 @@ class Config:
     FIREBASE_EMULATOR_HOST = os.getenv('FIREBASE_EMULATOR_HOST', 'localhost:8080')
     USE_FIREBASE_EMULATOR = os.getenv('USE_FIREBASE_EMULATOR', 'true').lower() == 'true'
     
+    # Firebase Config
+    FIREBASE_SERVICE_ACCOUNT_KEY = os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY')
+    FIREBASE_STORAGE_BUCKET = os.getenv('FIREBASE_STORAGE_BUCKET')
+    
+    # Development mode flag
+    IS_DEVELOPMENT = os.getenv('FLASK_ENV') == 'development'
+    
+    # Firebase Emulator ports (for development)
+    FIREBASE_AUTH_EMULATOR_HOST = os.getenv('FIREBASE_AUTH_EMULATOR_HOST', 'localhost:9099')
+    FIREBASE_FIRESTORE_EMULATOR_HOST = os.getenv('FIREBASE_FIRESTORE_EMULATOR_HOST', 'localhost:8080')
+    FIREBASE_STORAGE_EMULATOR_HOST = os.getenv('FIREBASE_STORAGE_EMULATOR_HOST', 'localhost:9199')
+    
     @classmethod
     def validate_config(cls):
         """Validate required configuration values"""
@@ -61,9 +73,11 @@ class Config:
             raise ValueError("Missing required configuration key: FIREBASE_SERVICE_ACCOUNT_KEY")
         
         # Validate FIREBASE_SERVICE_ACCOUNT_KEY is valid JSON
+   
         try:
             if isinstance(cls.FIREBASE_SERVICE_ACCOUNT_KEY, str):
                 json.loads(cls.FIREBASE_SERVICE_ACCOUNT_KEY)
+            
         except json.JSONDecodeError as e:
             raise ValueError(f"FIREBASE_SERVICE_ACCOUNT_KEY is not valid JSON: {str(e)}")
         

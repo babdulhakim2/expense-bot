@@ -4,7 +4,6 @@ import logging
 import json
 from datetime import datetime
 from PIL import Image
-import mimetypes
 import time
 import io
 from config import Config
