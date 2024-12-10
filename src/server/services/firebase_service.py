@@ -5,7 +5,7 @@ from firebase_admin import credentials, firestore, storage, auth
 from config import Config
 import logging
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import gspread
@@ -52,6 +52,12 @@ class FirebaseService:
                 os.environ["FIREBASE_AUTH_EMULATOR_HOST"] = Config.FIREBASE_AUTH_EMULATOR_HOST
                 os.environ["FIREBASE_STORAGE_EMULATOR_HOST"] = Config.FIREBASE_STORAGE_EMULATOR_HOST
                 logger.info("Using Firebase emulators")
+                # Set storage emulator host for development
+                self.storage_host = f"http://{Config.FIREBASE_STORAGE_EMULATOR_HOST}"
+                self.is_emulated = True
+            else:
+                self.storage_host = "https://storage.googleapis.com"
+                self.is_emulated = False
 
             if not len(firebase_admin._apps):
                 cred = credentials.Certificate(json.loads(Config.FIREBASE_SERVICE_ACCOUNT_KEY))
@@ -748,3 +754,128 @@ class FirebaseService:
         except Exception as e:
             logger.error(f"Error updating expense spreadsheet: {str(e)}")
             raise
+
+    def store_message(self, user_id: str, business_id: str, message_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Store a WhatsApp message interaction"""
+        try:
+            # Create message reference under the business
+            message_ref = self.db.collection('users').document(user_id)\
+                .collection('businesses').document(business_id)\
+                .collection('messages').document()
+            
+            message_data.update({
+                'message_id': message_ref.id,
+                'createdAt': firestore.SERVER_TIMESTAMP,
+                'status': 'delivered'
+            })
+            
+            # If there's media content, handle storage based on environment
+            if message_data.get('media_content'):
+                media_path = f"businesses/{business_id}/messages/{message_ref.id}/media"
+                
+                if self.is_emulated:
+                    # Handle storage emulator
+                    try:
+                        # Store media content reference for emulator
+                        media_url = f"{self.storage_host}/{Config.FIREBASE_STORAGE_BUCKET}/{media_path}"
+                        
+                        # In development, we might want to just store the content length
+                        # or hash instead of actually uploading
+                        media_data = message_data['media_content']
+                        content_length = len(media_data) if isinstance(media_data, bytes) else len(str(media_data))
+                        
+                        message_data.update({
+                            'media_url': media_url,
+                            'media_path': media_path,
+                            'media_size': content_length,
+                            'media_type': message_data.get('media_type', 'application/octet-stream'),
+                            'environment': 'development'
+                        })
+                        
+                        logger.info(f"Emulator: Stored media reference at {media_url}")
+                        
+                    except Exception as e:
+                        logger.warning(f"Emulator: Failed to handle media: {str(e)}")
+                        # Continue without media in development
+                        message_data['media_error'] = str(e)
+                else:
+                    # Production storage handling
+                    media_blob = self.bucket.blob(media_path)
+                    media_blob.upload_from_string(
+                        message_data['media_content'],
+                        content_type=message_data.get('media_type', 'application/octet-stream')
+                    )
+                    
+                    # Generate a signed URL that expires in 7 days
+                    media_url = media_blob.generate_signed_url(
+                        version="v4",
+                        expiration=datetime.timedelta(days=7),
+                        method="GET"
+                    )
+                    
+                    message_data.update({
+                        'media_url': media_url,
+                        'media_path': media_path,
+                        'environment': 'production'
+                    })
+                
+                # Remove the raw content from the stored data
+                del message_data['media_content']
+            
+            message_ref.set(message_data)
+            
+            return {
+                'id': message_ref.id,
+                **message_data
+            }
+            
+        except Exception as e:
+            logger.error(f"Error storing message: {str(e)}")
+            raise
+
+    def get_message_history(self, user_id: str, business_id: str, 
+                           limit: int = 50, start_after: str = None) -> List[Dict[str, Any]]:
+        """Get message history for a business with pagination"""
+        try:
+            query = self.db.collection('users').document(user_id)\
+                .collection('businesses').document(business_id)\
+                .collection('messages')\
+                .order_by('createdAt', direction=firestore.Query.DESCENDING)\
+                .limit(limit)
+            
+            if start_after:
+                # Get the last document for pagination
+                last_doc = self.db.collection('users').document(user_id)\
+                    .collection('businesses').document(business_id)\
+                    .collection('messages').document(start_after).get()
+                if last_doc.exists:
+                    query = query.start_after(last_doc)
+            
+            messages = query.stream()
+            
+            return [{
+                'id': msg.id,
+                **msg.to_dict()
+            } for msg in messages]
+            
+        except Exception as e:
+            logger.error(f"Error getting message history: {str(e)}")
+            return []
+
+    def get_message_by_id(self, user_id: str, business_id: str, message_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific message by ID"""
+        try:
+            message = self.db.collection('users').document(user_id)\
+                .collection('businesses').document(business_id)\
+                .collection('messages').document(message_id).get()
+            
+            if message.exists:
+                return {
+                    'id': message.id,
+                    **message.to_dict()
+                }
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting message: {str(e)}")
+            return None
