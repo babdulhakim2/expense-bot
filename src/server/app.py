@@ -2,28 +2,17 @@ import os
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 import requests
-import google.generativeai as genai
-from PIL import Image
-import io
 from dotenv import load_dotenv
 import weave
-import gspread
-import re
-from oauth2client.service_account import ServiceAccountCredentials
 import datetime
 import logging
-import sqlite3
-from datetime import datetime, timezone
-from googleapiclient.discovery import build
+from datetime import datetime
 from services.gemma2_service import Gemma2Service
 from services.gemini_service import GeminiService
 from config import Config
 from google.cloud import secretmanager
 import wandb
-from googleapiclient.errors import HttpError
-import firebase_admin
-from firebase_admin import credentials, firestore
-import json
+from services.firebase_service import FirebaseService
 
 load_dotenv()  # take environment variables from .env.
 
@@ -44,343 +33,10 @@ gemini_service = GeminiService()  # Fallback service
 # Dictionary to maintain chat history per user
 chat_sessions = {}
 
-# Google Sheets and Drive setup
-scope = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
 
-try:
-    # Write service account key to a temporary file
-    import tempfile
-    import json
-    
-    service_account_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
-    json.dump(json.loads(Config.SERVICE_ACCOUNT_KEY), service_account_file)
-    service_account_file.close()
-    
-    # Update your credentials initialization
-    creds = ServiceAccountCredentials.from_json_keyfile_name(service_account_file.name, scope)
-    
-except Exception as e:
-    logger.error(f"Failed to initialize credentials: {str(e)}")
-    raise
 
-sheets_client = gspread.authorize(creds)
-drive_service = build('drive', 'v3', credentials=creds)
-
-# Initialize Firebase Admin SDK
-firebase_creds = json.loads(Config.FIREBASE_SERVICE_ACCOUNT_KEY)
-cred = credentials.Certificate(firebase_creds)
-firebase_admin.initialize_app(cred)
-
-db = firestore.client()
-
-# Add these after the existing imports
-def get_or_create_user_folder(phone_number):
-    try:
-        user_ref = db.collection('users').document(phone_number)
-        user = user_ref.get()
-        
-        if user.exists:
-            folder_id = user.to_dict().get('folder_id')
-            user_email = user.to_dict().get('email')
-            logger.info(f"Found existing folder for {phone_number}: {folder_id}")
-            
-            try:
-                permissions = drive_service.permissions().list(
-                    fileId=folder_id,
-                    fields="permissions(emailAddress)"
-                ).execute().get('permissions', [])
-            except HttpError as e:
-                if e.resp.status == 404:
-                    logger.warning(f"Folder {folder_id} not found. Recreating folder.")
-                    
-                    # Recreate folder in Google Drive
-                    folder_metadata = {
-                        'name': f'Expenses_{phone_number}',
-                        'mimeType': 'application/vnd.google-apps.folder'
-                    }
-                    folder = drive_service.files().create(
-                        body=folder_metadata,
-                        fields='id'
-                    ).execute()
-                    folder_id = folder.get('id')
-                    
-                    # Share the new folder
-                    permission = {
-                        'type': 'user',
-                        'role': 'writer',
-                        'emailAddress': user_email
-                    }
-                    drive_service.permissions().create(
-                        fileId=folder_id,
-                        body=permission,
-                        sendNotificationEmail=False
-                    ).execute()
-                    
-                    # Update Firestore with new folder_id
-                    user_ref.update({
-                        'folder_id': folder_id
-                    })
-                    
-                    logger.info(f"Recreated and shared folder for {phone_number}: {folder_id}")
-                    return folder_id
-                else:
-                    logger.error(f"Failed to list permissions for folder {folder_id}: {str(e)}")
-                    raise e
-            
-            if not any(p.get('emailAddress') == user_email for p in permissions):
-                logger.info(f"Sharing folder with {user_email}")
-                permission = {
-                    'type': 'user',
-                    'role': 'writer',
-                    'emailAddress': user_email
-                }
-                drive_service.permissions().create(
-                    fileId=folder_id,
-                    body=permission,
-                    sendNotificationEmail=False
-                ).execute()
-            
-            return folder_id
-        
-        # Create new folder in Google Drive
-        folder_metadata = {
-            'name': f'Expenses_{phone_number}',
-            'mimeType': 'application/vnd.google-apps.folder'
-        }
-        folder = drive_service.files().create(
-            body=folder_metadata,
-            fields='id'
-        ).execute()
-        folder_id = folder.get('id')
-        
-        # Share the new folder
-        user_email = user.to_dict().get('email') if user.exists else os.environ.get('DEFAULT_USER_EMAIL')
-        permission = {
-            'type': 'user',
-            'role': 'writer',
-            'emailAddress': user_email
-        }
-        drive_service.permissions().create(
-            fileId=folder_id,
-            body=permission,
-            sendNotificationEmail=False
-        ).execute()
-        
-        # Store user info in Firestore
-        user_ref.set({
-            'folder_id': folder_id,
-            'created_at': firestore.SERVER_TIMESTAMP,
-            'email': user_email
-        })
-        
-        logger.info(f"Created and shared new folder for {phone_number}: {folder_id}")
-        return folder_id
-
-    except HttpError as e:
-        logger.error(f"Failed to manage folder due to API error: {str(e)}")
-        raise e
-    
-    except Exception as e:
-        logger.error(f"Failed to manage user folder: {str(e)}")
-        raise e
-
-def get_or_create_monthly_folder(phone_number, date):
-    """Get or create a folder for the specific month and year."""
-    try:
-        folder_name = f"Expenses_{phone_number}_{date.strftime('%B_%Y')}"
-        
-        # Check if folder exists in Firestore
-        folder_doc = db.collection('folders').document(f"{phone_number}_{date.strftime('%B_%Y')}")
-        folder = folder_doc.get()
-        
-        if folder.exists:
-            folder_id = folder.to_dict().get('folder_id')
-            logger.info(f"Found existing folder: {folder_id}")
-            return folder_id
-            
-        # Create new folder in Google Drive
-        folder_metadata = {
-            'name': folder_name,
-            'mimeType': 'application/vnd.google-apps.folder'
-        }
-        
-        drive_folder = drive_service.files().create(
-            body=folder_metadata,
-            fields='id'
-        ).execute()
-        
-        folder_id = drive_folder.get('id')
-        
-        # Share folder with user
-        user_doc = db.collection('users').document(phone_number).get()
-        user_email = user_doc.to_dict().get('email') if user_doc.exists else os.environ.get('DEFAULT_USER_EMAIL')
-        
-        permission = {
-            'type': 'user',
-            'role': 'writer',
-            'emailAddress': user_email
-        }
-        
-        drive_service.permissions().create(
-            fileId=folder_id,
-            body=permission,
-            sendNotificationEmail=False
-        ).execute()
-        
-        # Store folder info in Firestore
-        folder_doc.set({
-            'folder_id': folder_id,
-            'created_at': firestore.SERVER_TIMESTAMP,
-            'month_year': date.strftime('%B_%Y'),
-            'user_email': user_email
-        })
-        
-        logger.info(f"Created new folder: {folder_id}")
-        return folder_id
-        
-    except Exception as e:
-        logger.error(f"Error in get_or_create_monthly_folder: {str(e)}")
-        raise
-
-def get_folder_url(phone_number, date):
-    """Get the URL for the monthly folder."""
-    try:
-        folder_doc = db.collection('folders').document(f"{phone_number}_{date.strftime('%B_%Y')}")
-        folder = folder_doc.get()
-        
-        if folder.exists:
-            folder_id = folder.to_dict().get('folder_id')
-            return f"https://drive.google.com/drive/folders/{folder_id}"
-            
-        return None
-        
-    except Exception as e:
-        logger.error(f"Error getting folder URL: {str(e)}")
-        return None
-
-def get_or_create_spreadsheet(phone_number, date):
-    """Get or create spreadsheet in the monthly folder."""
-    try:
-        folder_id = get_or_create_monthly_folder(phone_number, date)
-        spreadsheet_name = f'Expenses_{phone_number}_{date.strftime("%B_%Y")}'
-        
-        try:
-            spreadsheet = sheets_client.open(spreadsheet_name)
-        except gspread.SpreadsheetNotFound:
-            spreadsheet = sheets_client.create(spreadsheet_name)
-            
-            # Move to monthly folder
-            file_id = spreadsheet.id
-            file = drive_service.files().get(
-                fileId=file_id,
-                fields='parents'
-            ).execute()
-            previous_parents = ",".join(file.get('parents', []))
-            
-            # Move the file to the new folder
-            drive_service.files().update(
-                fileId=file_id,
-                addParents=folder_id,
-                removeParents=previous_parents,
-                fields='id, parents'
-            ).execute()
-        
-        # Share with user's email
-        user_doc = db.collection('users').document(phone_number).get()
-        email = user_doc.to_dict().get('email') if user_doc.exists else os.environ.get('DEFAULT_USER_EMAIL')
-        
-        permissions = spreadsheet.list_permissions()
-        if not any(p.get('emailAddress') == email for p in permissions):
-            spreadsheet.share(email, perm_type='user', role='writer', notify=False)
-        
-        return spreadsheet
-        
-    except Exception as e:
-        logger.error(f"Error in get_or_create_spreadsheet: {str(e)}")
-        raise
-
-def get_or_create_worksheet(spreadsheet, worksheet_name):
-    try:
-        worksheet = spreadsheet.worksheet(worksheet_name)
-    except gspread.exceptions.WorksheetNotFound:
-        worksheet = spreadsheet.add_worksheet(title=worksheet_name, rows="1000", cols="20")
-        # Initialize headers with new columns
-        headers = [
-            'Transaction started (UTC)',
-            'Transaction completed (UTC)',
-            'Transaction ID',
-            'Transaction status',
-            'Transaction type',
-            'Transaction description',
-            'Payer',
-            'Card number',
-            'Expense split #',
-            'Orig currency',
-            'Orig amount (Orig currency)'
-        ]
-        worksheet.append_row(headers)
-    return worksheet
-
-def update_expense_sheet(date, amount, item, phone_number):
-    try:
-        spreadsheet = get_or_create_spreadsheet(phone_number, date)
-        worksheet_name = date.strftime('%B %Y')
-        worksheet = get_or_create_worksheet(spreadsheet, worksheet_name)
-        
-        # Generate transaction ID
-        transaction_id = f"TXN_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        
-        # Prepare row data with all fields
-        row_data = [
-            datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),  # Transaction started
-            datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),  # Transaction completed
-            transaction_id,                                            # Transaction ID
-            'Completed',                                              # Transaction status
-            'Expense',                                                # Transaction type
-            item,                                                     # Transaction description
-            'N/A',                                                    # Payer
-            'N/A',                                                    # Card number
-            '1',                                                      # Expense split
-            'USD',                                                    # Original currency
-            amount                                                    # Original amount
-        ]
-        
-        worksheet.append_row(row_data)
-        
-        # Get spreadsheet URL
-        spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet.id}"
-        logger.info(f"Expense added to spreadsheet: {spreadsheet_url}")
-        
-        return spreadsheet_url, transaction_id
-        
-    except Exception as e:
-        logger.error(f"Error updating expense sheet: {str(e)}")
-        raise e
-
-def parse_expense_text(text):
-    # For simplicity, let's assume the text contains date, amount, and item in a known format
-    # You can adjust the parsing logic as needed
-
-    # Mock parsing for demonstration purposes
-    # Example text: "Expense: Lunch; Amount: 15.50; Date: 2024-11-08"
-    date_match = re.search(r'Date:\s*(\d{4}-\d{2}-\d{2})', text)
-    amount_match = re.search(r'Amount:\s*(\d+(\.\d{2})?)', text)
-    item_match = re.search(r'Expense:\s*(.+?);', text)
-
-    if date_match and amount_match and item_match:
-        date_str = date_match.group(1)
-        amount_str = amount_match.group(1)
-        item = item_match.group(1)
-    else:
-        # If parsing fails, return some default values or raise an error
-        date_str = datetime.now().strftime('%Y-%m-%d')
-        amount_str = '0.00'
-        item = 'Unknown Expense'
-
-    return datetime.strptime(date_str, '%Y-%m-%d'), float(amount_str), item
+# Initialize Firebase service
+firebase_service = FirebaseService()
 
 @app.route('/whatsapp', methods=['POST'])
 def whatsapp():
@@ -395,6 +51,25 @@ def whatsapp():
         
         resp = MessagingResponse()
         msg = resp.message()
+
+        # Check if user exists
+        print(f"Checking if user exists: {phone_number}")
+        user = firebase_service.get_user_by_phone(phone_number)
+        if not user:
+            registration_url = firebase_service.get_user_registration_url()
+            msg.body(
+                "👋 Welcome to ExpenseBot!\n\n"
+                "It looks like you haven't registered yet. "
+                f"Please create an account at:\n{registration_url}\n\n"
+                "Once registered, you can start tracking your expenses!"
+            )
+            return str(resp)
+
+        # Get or create active business for user
+        business = firebase_service.get_active_business(user['id'])
+        if not business:
+            msg.body("Sorry, there was an error accessing your business account. Please try again later.")
+            return str(resp)
 
         if num_media > 0:
             # Process media message
@@ -453,30 +128,55 @@ def whatsapp():
         if not is_transaction:
             msg.body(response)
             return str(resp)
-            
-        # Retrieve user email from Firestore
-        user_doc = db.collection('users').document(phone_number).get()
-        if user_doc.exists:
-            user_email = user_doc.to_dict().get('email')
-        else:
-            user_email = os.environ.get('DEFAULT_USER_EMAIL')  # Fallback email
-        
-        # Update spreadsheet with transaction
-        spreadsheet_url, transaction_id = update_expense_sheet(
-            datetime.strptime(transaction['transaction_date'], '%Y-%m-%d'),
-            transaction['amount'],
-            transaction['description'],
-            phone_number
-        )
-        
-        # Get folder URL using transaction date
+
+        # Get or create monthly folder
         transaction_date = datetime.strptime(transaction['transaction_date'], '%Y-%m-%d')
-        folder_url = get_folder_url(phone_number, transaction_date)
-        
-        # Format success response with currency information
+        monthly_folder = firebase_service.get_or_create_monthly_folder(
+            user_id=user['id'],
+            business_id=business['id'],
+            date=transaction_date
+        )
+
+        # Record the expense
+        expense = firebase_service.record_expense(
+            user_id=user['id'],
+            business_id=business['id'],
+            expense_data={
+                'date': transaction['transaction_date'],
+                'amount': transaction['amount'],
+                'description': transaction['description'],
+                'category': transaction['category'],
+                'payment_method': transaction['payment_method'],
+                'merchant': transaction.get('merchant', 'N/A'),
+                'orig_currency': transaction.get('orig_currency', 'GBP'),
+                'orig_amount': transaction.get('orig_amount', transaction['amount']),
+                'exchange_rate': transaction.get('exchange_rate', 1.0),
+                'folder_id': monthly_folder['id']
+            }
+        )
+
+        # Update the spreadsheet with the new expense
+        if monthly_folder.get('spreadsheet'):
+            firebase_service.update_expense_spreadsheet(
+                user_id=user['id'],
+                business_id=business['id'],
+                spreadsheet_id=monthly_folder['spreadsheet']['id'],
+                expense_data={
+                    'date': transaction['transaction_date'],
+                    'description': transaction['description'],
+                    'amount': transaction['amount'],
+                    'category': transaction['category'],
+                    'payment_method': transaction['payment_method'],
+                    'status': 'Completed',
+                    'action_id': expense['action_id'],
+                    'createdAt': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+            )
+
+        # Format success response
         response_text = (
             f"✅ Transaction recorded!\n\n"
-            f"🆔 {transaction_id}\n"
+            f"🆔 {expense['id']}\n"
             f"📝 {transaction['description']}\n"
         )
 
@@ -495,9 +195,21 @@ def whatsapp():
             f"🏷️ {transaction['category']}\n"
             f"💳 {transaction['payment_method']}\n"
             f"🏪 {transaction.get('merchant', 'N/A')}\n\n"
-            f"📊 View spreadsheet: {spreadsheet_url}\n"
-            f"📁 View folder: {folder_url}"
+            f"📊 View your expenses at:\n"
+            f"https://expensebot.xyz/dashboard"
         )
+        
+        if monthly_folder.get('folder_url'):
+            response_text += (
+                f"📂 View folder at:\n"
+                f"{monthly_folder['folder_url']}\n\n"
+            )
+        
+        if monthly_folder.get('spreadsheet', {}).get('url'):
+            response_text += (
+                f"📊 View spreadsheet at:\n"
+                f"{monthly_folder['spreadsheet']['url']}\n\n"
+            )
         
         msg.body(response_text)
         return str(resp)
