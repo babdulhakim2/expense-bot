@@ -11,6 +11,7 @@ from googleapiclient.discovery import build
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import re
+from .google_drive_service import GoogleDriveService
 
 # Google Sheets and Drive setup
 scope = [
@@ -43,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 class FirebaseService:
     def __init__(self):
-        """Initialize Firebase and set up development/production environment"""
+        """Initialize Firebase and Google Drive services"""
         try:
             if Config.IS_DEVELOPMENT:
                 os.environ["FIRESTORE_EMULATOR_HOST"] = Config.FIREBASE_FIRESTORE_EMULATOR_HOST
@@ -75,7 +76,8 @@ class FirebaseService:
             )
             self.drive_service = build('drive', 'v3', credentials=self.drive_credentials)
 
-           
+            # Initialize Google Drive service
+            self.drive_service = GoogleDriveService()
 
         except Exception as e:
             logger.error(f"Failed to initialize Firebase: {str(e)}")
@@ -343,10 +345,7 @@ class FirebaseService:
                 folder_data = folder_docs[0].to_dict()
                 # Verify folder still exists in Drive
                 try:
-                    folder = self.drive_service.files().get(
-                        fileId=folder_data['drive_folder_id'],
-                        fields='id, name, webViewLink'
-                    ).execute()
+                    folder = self.drive_service.get_file(folder_data['drive_folder_id'])
                     return {
                         'id': folder_data['folder_id'],
                         'drive_id': folder_data['drive_folder_id'],
@@ -358,15 +357,9 @@ class FirebaseService:
                     logger.warning(f"Drive folder not found, will recreate: {str(e)}")
 
             # Create new business folder in Drive
-            folder_metadata = {
-                'name': f"Business-{business_id}",
-                'mimeType': 'application/vnd.google-apps.folder'
-            }
-            
-            drive_folder = self.drive_service.files().create(
-                body=folder_metadata,
-                fields='id, name, webViewLink'
-            ).execute()
+            drive_folder = self.drive_service.create_folder(
+                folder_name=f"Business-{business_id}"
+            )
             
             # Record folder creation action
             self.record_ai_action(
@@ -375,21 +368,34 @@ class FirebaseService:
                 action_type='folder_created',
                 action_data={
                     'type': 'business_root',
-                    'name': drive_folder.get('name'),
-                    'drive_folder_id': drive_folder.get('id'),
-                    'url': drive_folder.get('webViewLink')
+                    'name': drive_folder['name'],
+                    'drive_folder_id': drive_folder['id'],
+                    'url': drive_folder['url']
                 },
-                related_id=drive_folder.get('id')
+                related_id=drive_folder['id']
             )
             
+            # Get user email for permissions
+            user = self.db.collection('users').document(user_id).get()
+            if not user.exists:
+                raise ValueError(f"User {user_id} not found")
+            
+            user_email = user.to_dict().get('email')
+            service_account = json.loads(Config.SERVICE_ACCOUNT_KEY)
+            service_account_email = service_account['client_email']
+            
             # Set permissions
-            self._set_permissions(drive_folder.get('id'), user_id)
+            self.drive_service.set_permissions(
+                drive_folder['id'],
+                user_email,
+                service_account_email
+            )
             
             # Store in Firestore
             folder_data = {
-                'name': drive_folder.get('name'),
-                'drive_folder_id': drive_folder.get('id'),
-                'url': drive_folder.get('webViewLink'),
+                'name': drive_folder['name'],
+                'drive_folder_id': drive_folder['id'],
+                'url': drive_folder['url'],
                 'type': 'business_root'
             }
             
@@ -397,9 +403,9 @@ class FirebaseService:
             
             return {
                 'id': folder_id,
-                'drive_id': drive_folder.get('id'),
-                'name': drive_folder.get('name'),
-                'url': drive_folder.get('webViewLink'),
+                'drive_id': drive_folder['id'],
+                'name': drive_folder['name'],
+                'url': drive_folder['url'],
                 'type': 'business_root'
             }
                 
@@ -425,10 +431,7 @@ class FirebaseService:
                 folder_data = folder_docs[0].to_dict()
                 # Verify folder still exists in Drive
                 try:
-                    folder = self.drive_service.files().get(
-                        fileId=folder_data['drive_folder_id'],
-                        fields='id, name, webViewLink'
-                    ).execute()
+                    folder = self.drive_service.get_file(folder_data['drive_folder_id'])
                     return {
                         'id': folder_data['folder_id'],
                         'drive_id': folder_data['drive_folder_id'],
@@ -440,16 +443,10 @@ class FirebaseService:
                     logger.warning(f"Drive folder not found, will recreate: {str(e)}")
 
             # Create Transactions folder
-            folder_metadata = {
-                'name': 'Transactions',
-                'mimeType': 'application/vnd.google-apps.folder',
-                'parents': [business_folder_id]
-            }
-            
-            drive_folder = self.drive_service.files().create(
-                body=folder_metadata,
-                fields='id, name, webViewLink'
-            ).execute()
+            drive_folder = self.drive_service.create_folder(
+                folder_name='Transactions',
+                parent_id=business_folder_id
+            )
             
             # Record transactions folder creation action
             self.record_ai_action(
@@ -458,22 +455,35 @@ class FirebaseService:
                 action_type='folder_created',
                 action_data={
                     'type': 'transactions_folder',
-                    'name': drive_folder.get('name'),
-                    'drive_folder_id': drive_folder.get('id'),
-                    'url': drive_folder.get('webViewLink'),
+                    'name': drive_folder['name'],
+                    'drive_folder_id': drive_folder['id'],
+                    'url': drive_folder['url'],
                     'parent_folder_id': business_folder_id
                 },
-                related_id=drive_folder.get('id')
+                related_id=drive_folder['id']
             )
             
+            # Get user email for permissions
+            user = self.db.collection('users').document(user_id).get()
+            if not user.exists:
+                raise ValueError(f"User {user_id} not found")
+            
+            user_email = user.to_dict().get('email')
+            service_account = json.loads(Config.SERVICE_ACCOUNT_KEY)
+            service_account_email = service_account['client_email']
+            
             # Set permissions
-            self._set_permissions(drive_folder.get('id'), user_id)
+            self.drive_service.set_permissions(
+                drive_folder['id'],
+                user_email,
+                service_account_email
+            )
             
             # Store in Firestore
             folder_data = {
-                'name': drive_folder.get('name'),
-                'drive_folder_id': drive_folder.get('id'),
-                'url': drive_folder.get('webViewLink'),
+                'name': drive_folder['name'],
+                'drive_folder_id': drive_folder['id'],
+                'url': drive_folder['url'],
                 'type': 'transactions',
                 'parent_folder_id': business_folder_id
             }
@@ -482,9 +492,9 @@ class FirebaseService:
             
             return {
                 'id': folder_id,
-                'drive_id': drive_folder.get('id'),
-                'name': drive_folder.get('name'),
-                'url': drive_folder.get('webViewLink'),
+                'drive_id': drive_folder['id'],
+                'name': drive_folder['name'],
+                'url': drive_folder['url'],
                 'type': 'transactions'
             }
                 
@@ -496,9 +506,9 @@ class FirebaseService:
                                  transactions_folder_id: str) -> Dict[str, Any]:
         """Get or create year folder within Transactions folder"""
         try:
-            # First check Firestore for existing folder
-            year = datetime.now().strftime('%Y')  # Use current year if not specified
+            year = datetime.now().strftime('%Y')
             
+            # First check Firestore for existing folder
             folders = self.db.collection('users').document(user_id)\
                 .collection('businesses').document(business_id)\
                 .collection('folders')\
@@ -513,10 +523,7 @@ class FirebaseService:
                 folder_data = folder_docs[0].to_dict()
                 # Verify folder still exists in Drive
                 try:
-                    folder = self.drive_service.files().get(
-                        fileId=folder_data['drive_folder_id'],
-                        fields='id, name, webViewLink'
-                    ).execute()
+                    folder = self.drive_service.get_file(folder_data['drive_folder_id'])
                     return {
                         'id': folder_data['folder_id'],
                         'drive_id': folder_data['drive_folder_id'],
@@ -529,16 +536,10 @@ class FirebaseService:
                     logger.warning(f"Drive folder not found, will recreate: {str(e)}")
 
             # Create year folder
-            folder_metadata = {
-                'name': year,
-                'mimeType': 'application/vnd.google-apps.folder',
-                'parents': [transactions_folder_id]
-            }
-            
-            drive_folder = self.drive_service.files().create(
-                body=folder_metadata,
-                fields='id, name, webViewLink'
-            ).execute()
+            drive_folder = self.drive_service.create_folder(
+                folder_name=year,
+                parent_id=transactions_folder_id
+            )
             
             # Record year folder creation action
             self.record_ai_action(
@@ -547,23 +548,36 @@ class FirebaseService:
                 action_type='folder_created',
                 action_data={
                     'type': 'year_folder',
-                    'name': drive_folder.get('name'),
-                    'drive_folder_id': drive_folder.get('id'),
-                    'url': drive_folder.get('webViewLink'),
+                    'name': drive_folder['name'],
+                    'drive_folder_id': drive_folder['id'],
+                    'url': drive_folder['url'],
                     'parent_folder_id': transactions_folder_id,
                     'year': year
                 },
-                related_id=drive_folder.get('id')
+                related_id=drive_folder['id']
             )
             
+            # Get user email for permissions
+            user = self.db.collection('users').document(user_id).get()
+            if not user.exists:
+                raise ValueError(f"User {user_id} not found")
+            
+            user_email = user.to_dict().get('email')
+            service_account = json.loads(Config.SERVICE_ACCOUNT_KEY)
+            service_account_email = service_account['client_email']
+            
             # Set permissions
-            self._set_permissions(drive_folder.get('id'), user_id)
+            self.drive_service.set_permissions(
+                drive_folder['id'],
+                user_email,
+                service_account_email
+            )
             
             # Store in Firestore
             folder_data = {
-                'name': drive_folder.get('name'),
-                'drive_folder_id': drive_folder.get('id'),
-                'url': drive_folder.get('webViewLink'),
+                'name': drive_folder['name'],
+                'drive_folder_id': drive_folder['id'],
+                'url': drive_folder['url'],
                 'type': 'year',
                 'year': year,
                 'parent_folder_id': transactions_folder_id
@@ -573,9 +587,9 @@ class FirebaseService:
             
             return {
                 'id': folder_id,
-                'drive_id': drive_folder.get('id'),
-                'name': drive_folder.get('name'),
-                'url': drive_folder.get('webViewLink'),
+                'drive_id': drive_folder['id'],
+                'name': drive_folder['name'],
+                'url': drive_folder['url'],
                 'type': 'year',
                 'year': year
             }
@@ -606,28 +620,26 @@ class FirebaseService:
             spreadsheet_docs = list(spreadsheets)
             if spreadsheet_docs:
                 spreadsheet_data = spreadsheet_docs[0].to_dict()
-                spreadsheet_data['spreadsheet_id'] = spreadsheet_docs[0].id  # Add document ID
+                spreadsheet_data['spreadsheet_id'] = spreadsheet_docs[0].id
                 # Verify spreadsheet still exists in Drive
                 try:
-                    spreadsheet = self.drive_service.files().get(
-                        fileId=spreadsheet_data['drive_spreadsheet_id'],
-                        fields='id, name, webViewLink'
-                    ).execute()
+                    spreadsheet = self.drive_service.get_file(spreadsheet_data['drive_spreadsheet_id'])
                     return spreadsheet_data
                 except Exception as e:
                     logger.warning(f"Drive spreadsheet not found, will recreate: {str(e)}")
 
             # Create new spreadsheet
-            spreadsheet_metadata = {
-                'name': spreadsheet_name,
-                'mimeType': 'application/vnd.google-apps.spreadsheet',
-                'parents': [year_folder_id]
-            }
+            drive_spreadsheet = self.drive_service.create_spreadsheet(
+                name=spreadsheet_name,
+                parent_folder_id=year_folder_id
+            )
             
-            drive_spreadsheet = self.drive_service.files().create(
-                body=spreadsheet_metadata,
-                fields='id, name, webViewLink'
-            ).execute()
+            # Initialize the spreadsheet
+            self.drive_service.initialize_expense_spreadsheet(
+                drive_spreadsheet['id'],
+                month_name,
+                year
+            )
             
             # Record spreadsheet creation
             self.record_ai_action(
@@ -635,23 +647,29 @@ class FirebaseService:
                 business_id=business_id,
                 action_type='spreadsheet_created',
                 action_data={
-                    'drive_spreadsheet_id': drive_spreadsheet.get('id'),
-                    'url': drive_spreadsheet.get('webViewLink'),
-                    'month': date.strftime('%B'),
-                    'year': date.strftime('%Y'),
+                    'drive_spreadsheet_id': drive_spreadsheet['id'],
+                    'url': drive_spreadsheet['url'],
+                    'month': month_name,
+                    'year': year,
                     'parent_folder_id': year_folder_id
                 },
-                related_id=drive_spreadsheet.get('id')
+                related_id=drive_spreadsheet['id']
             )
             
-            # Set permissions
-            self._set_permissions(drive_spreadsheet.get('id'), user_id)
+            # Get user email for permissions
+            user = self.db.collection('users').document(user_id).get()
+            if not user.exists:
+                raise ValueError(f"User {user_id} not found")
             
-            # Initialize spreadsheet with headers
-            self._initialize_expense_spreadsheet(
-                drive_spreadsheet.get('id'), 
-                month_name,
-                year
+            user_email = user.to_dict().get('email')
+            service_account = json.loads(Config.SERVICE_ACCOUNT_KEY)
+            service_account_email = service_account['client_email']
+            
+            # Set permissions
+            self.drive_service.set_permissions(
+                drive_spreadsheet['id'],
+                user_email,
+                service_account_email
             )
             
             # Create Firestore document
@@ -660,15 +678,15 @@ class FirebaseService:
                 .collection('spreadsheets').document()
             
             spreadsheet_data = {
-                'name': drive_spreadsheet.get('name'),
-                'drive_spreadsheet_id': drive_spreadsheet.get('id'),
-                'url': drive_spreadsheet.get('webViewLink'),
+                'name': drive_spreadsheet['name'],
+                'drive_spreadsheet_id': drive_spreadsheet['id'],
+                'url': drive_spreadsheet['url'],
                 'type': 'expense_spreadsheet',
                 'month': month_name,
                 'year': year,
                 'sheet_name': sheet_name,
                 'parent_folder_id': year_folder_id,
-                'spreadsheet_id': spreadsheet_ref.id,  # Add document ID
+                'spreadsheet_id': spreadsheet_ref.id,
                 'createdAt': firestore.SERVER_TIMESTAMP,
                 'updatedAt': firestore.SERVER_TIMESTAMP
             }
@@ -681,104 +699,7 @@ class FirebaseService:
             logger.error(f"Error in get_or_create_monthly_spreadsheet: {str(e)}")
             raise
 
-    def _initialize_expense_spreadsheet(self, spreadsheet_id: str, month_name: str, year: str):
-        """Initialize a new expense spreadsheet with headers and formatting"""
-        try:
-            sheets_service = build('sheets', 'v4', credentials=self.drive_credentials)
-            sheet_name = f"{month_name} {year}"
-            
-            logger.info(f"Initializing spreadsheet {spreadsheet_id} with sheet name: {sheet_name}")
-
-            # Rename default sheet
-            rename_request = {
-                'requests': [{
-                    'updateSheetProperties': {
-                        'properties': {
-                            'sheetId': 0,
-                            'title': sheet_name
-                        },
-                        'fields': 'title'
-                    }
-                }]
-            }
-            
-            sheets_service.spreadsheets().batchUpdate(
-                spreadsheetId=spreadsheet_id,
-                body=rename_request
-            ).execute()
-            
-            # Define headers with essential fields only
-            headers = [[
-                'Date',             # A
-                'Description',      # B
-                'Amount',           # C
-                'Category',         # D
-                'Payment Method',   # E
-                'Status',          # F
-                'Transaction ID',   # G - This will now store the Firestore transaction ID
-                'Merchant',        # H - Ensure merchant column is present
-                'Original Currency', # I
-                'Original Amount',  # J
-                'Exchange Rate',    # K
-                'Timestamp',       # L
-                'Created At'       # M
-            ]]
-            
-            # Update headers
-            sheets_service.spreadsheets().values().update(
-                spreadsheetId=spreadsheet_id,
-                range=f"{sheet_name}!A1:M1",
-                valueInputOption='RAW',
-                body={'values': headers}
-            ).execute()
-            
-            # Format headers - make them bold with gray background
-            format_request = {
-                'requests': [
-                    {
-                        'repeatCell': {
-                            'range': {
-                                'sheetId': 0,
-                                'startRowIndex': 0,
-                                'endRowIndex': 1,
-                                'startColumnIndex': 0,
-                                'endColumnIndex': 13  # A through M
-                            },
-                            'cell': {
-                                'userEnteredFormat': {
-                                    'backgroundColor': {'red': 0.9, 'green': 0.9, 'blue': 0.9},
-                                    'textFormat': {'bold': True},
-                                    'horizontalAlignment': 'CENTER',
-                                    'verticalAlignment': 'MIDDLE'
-                                }
-                            },
-                            'fields': 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)'
-                        }
-                    },
-                    # Freeze the header row
-                    {
-                        'updateSheetProperties': {
-                            'properties': {
-                                'sheetId': 0,
-                                'gridProperties': {
-                                    'frozenRowCount': 1
-                                }
-                            },
-                            'fields': 'gridProperties.frozenRowCount'
-                        }
-                    }
-                ]
-            }
-            
-            sheets_service.spreadsheets().batchUpdate(
-                spreadsheetId=spreadsheet_id,
-                body=format_request
-            ).execute()
-
-        except Exception as e:
-            logger.error(f"Error initializing spreadsheet: {str(e)}")
-            raise
-
+    
     def record_expense(self, user_id: str, business_id: str, expense_data: Dict[str, Any]) -> Dict[str, Any]:
         """Record an expense transaction"""
         try:
@@ -822,155 +743,7 @@ class FirebaseService:
             logger.error(f"Error recording expense: {str(e)}")
             raise
 
-    def get_user_registration_url(self) -> str:
-        """Get the URL where users can register"""
-        # This should be configured somewhere in your application
-        return "https://expensebot.xyz"
-
-    def get_spreadsheet_history(self, user_id: str, business_id: str, 
-                              spreadsheet_id: str) -> list:
-        """Get history of updates for a specific spreadsheet"""
-        try:
-            updates = self.db.collection('users').document(user_id)\
-                .collection('businesses').document(business_id)\
-                .collection('spreadsheets').document(spreadsheet_id)\
-                .collection('updates')\
-                .order_by('createdAt', direction=firestore.Query.DESCENDING)\
-                .stream()
-                
-            return [{
-                'id': update.id,
-                **update.to_dict()
-            } for update in updates]
-                
-        except Exception as e:
-            logger.error(f"Error getting spreadsheet history: {str(e)}")
-            return []
-
-    def get_or_create_monthly_folder(self, user_id: str, business_id: str, date: datetime) -> Dict[str, Any]:
-        """Get or create a folder for the specific month and year."""
-        try:
-            folder_name = f"Expenses_{date.strftime('%B_%Y')}"
-            
-            # Get business folder ID first
-            business_folder_id = self.get_or_create_business_folder(user_id, business_id)
-            
-            # Check if folder exists in Drive first
-            existing_drive_folder = self.get_folder_by_name(business_folder_id, folder_name)
-            
-            if existing_drive_folder:
-                # Check if we have it in Firestore
-                folders = self.db.collection('users').document(user_id)\
-                    .collection('businesses').document(business_id)\
-                    .collection('folders')\
-                    .where('drive_folder_id', '==', existing_drive_folder['id'])\
-                    .limit(1)\
-                    .stream()
-                
-                folder_docs = list(folders)
-                if folder_docs:
-                    folder_doc = folder_docs[0]
-                    folder_data = folder_doc.to_dict()
-                    folder_data['id'] = folder_doc.id  # Add Firestore ID
-                    
-                    # Get or create spreadsheet
-                    spreadsheet = self.get_or_create_monthly_spreadsheet(
-                        user_id=user_id,
-                        business_id=business_id,
-                        folder_id=folder_data['drive_folder_id'],
-                        firestore_folder_id=folder_doc.id,
-                        date=date
-                    )
-                    folder_data['spreadsheet'] = spreadsheet
-                    
-                    return folder_data
-                
-                # If not in Firestore, create the record
-                drive_folder_id = existing_drive_folder['id']
-                folder_url = existing_drive_folder['webViewLink']
-            
-            else:
-                # Create new folder in Drive
-                folder_metadata = {
-                    'name': folder_name,
-                    'mimeType': 'application/vnd.google-apps.folder',
-                    'parents': [business_folder_id]
-                }
-                
-                drive_folder = self.drive_service.files().create(
-                    body=folder_metadata,
-                    fields='id, webViewLink'
-                ).execute()
-                
-                drive_folder_id = drive_folder.get('id')
-                folder_url = drive_folder.get('webViewLink')
-                
-                # Share folder with user
-                user = self.db.collection('users').document(user_id).get()
-                if not user.exists:
-                    raise ValueError(f"User {user_id} not found")
-                user_email = user.to_dict().get('email')
-                if user_email:
-                    permission = {
-                        'type': 'user',
-                        'role': 'writer',
-                        'emailAddress': user_email
-                    }
-                    self.drive_service.permissions().create(
-                        fileId=drive_folder_id,
-                        body=permission,
-                        sendNotificationEmail=False
-                    ).execute()
-            
-            # Create/Update Firestore record
-            folder_ref = self.db.collection('users').document(user_id)\
-                .collection('businesses').document(business_id)\
-                .collection('folders').document()
-            
-            folder_data = {
-                'name': folder_name,
-                'month_year': date.strftime('%B_%Y'),
-                'drive_folder_id': drive_folder_id,
-                'folder_url': folder_url,
-                'status': 'active',
-                'createdAt': firestore.SERVER_TIMESTAMP,
-                'updatedAt': firestore.SERVER_TIMESTAMP
-            }
-            
-            # Record action
-            action_id = self.record_ai_action(
-                user_id=user_id,
-                business_id=business_id,
-                action_type='create_folder',
-                action_data={
-                    'folder_name': folder_name,
-                    'drive_folder_id': drive_folder_id,
-                    'folder_url': folder_url,
-                    'firestore_folder_id': folder_ref.id
-                }
-            )
-            
-            folder_data['action_id'] = action_id
-            folder_ref.set(folder_data)
-            
-            # Get or create spreadsheet
-            spreadsheet = self.get_or_create_monthly_spreadsheet(
-                user_id=user_id,
-                business_id=business_id,
-                folder_id=drive_folder_id,
-                firestore_folder_id=folder_ref.id,
-                date=date
-            )
-            
-            folder_data['id'] = folder_ref.id
-            folder_data['spreadsheet'] = spreadsheet
-            
-            return folder_data
-            
-        except Exception as e:
-            logger.error(f"Error in get_or_create_monthly_folder: {str(e)}")
-            raise
-
+    
     def update_expense_spreadsheet(self, user_id: str, business_id: str, 
                                  spreadsheet_id: str, expense_data: Dict[str, Any]) -> Dict[str, Any]:
         """Update expense spreadsheet with new transaction."""
@@ -1189,147 +962,7 @@ class FirebaseService:
             logger.error(f"Error storing message: {str(e)}")
             raise
 
-    def get_message_history(self, user_id: str, business_id: str, 
-                           limit: int = 50, start_after: str = None) -> List[Dict[str, Any]]:
-        """Get message history for a business with pagination"""
-        try:
-            query = self.db.collection('users').document(user_id)\
-                .collection('businesses').document(business_id)\
-                .collection('messages')\
-                .order_by('createdAt', direction=firestore.Query.DESCENDING)\
-                .limit(limit)
-            
-            if start_after:
-                # Get the last document for pagination
-                last_doc = self.db.collection('users').document(user_id)\
-                    .collection('businesses').document(business_id)\
-                    .collection('messages').document(start_after).get()
-                if last_doc.exists:
-                    query = query.start_after(last_doc)
-            
-            messages = query.stream()
-            
-            return [{
-                'id': msg.id,
-                **msg.to_dict()
-            } for msg in messages]
-            
-        except Exception as e:
-            logger.error(f"Error getting message history: {str(e)}")
-            return []
-
-    def get_message_by_id(self, user_id: str, business_id: str, message_id: str) -> Optional[Dict[str, Any]]:
-        """Get a specific message by ID"""
-        try:
-            message = self.db.collection('users').document(user_id)\
-                .collection('businesses').document(business_id)\
-                .collection('messages').document(message_id).get()
-            
-            if message.exists:
-                return {
-                    'id': message.id,
-                    **message.to_dict()
-                }
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error getting message: {str(e)}")
-            return None
-
     
-
-    def _set_permissions(self, file_id: str, user_id: str):
-        """Set permissions for a Drive file/folder for both user and service account"""
-        try:
-            # Get user email from Firestore
-            user = self.db.collection('users').document(user_id).get()
-            if not user.exists:
-                raise ValueError(f"User {user_id} not found")
-            
-            user_email = user.to_dict().get('email')
-            if not user_email:
-                raise ValueError(f"No email found for user {user_id}")
-
-            # Get service account email
-            service_account = json.loads(Config.SERVICE_ACCOUNT_KEY)
-            service_account_email = service_account['client_email']
-
-            logger.info(f"Setting permissions for file {file_id}")
-            logger.info(f"User email: {user_email}")
-            logger.info(f"Service account email: {service_account_email}")
-
-            try:
-                # First give the user editor access
-                user_permission = {
-                    'type': 'user',
-                    'role': 'writer',
-                    'emailAddress': user_email
-                }
-                
-                self.drive_service.permissions().create(
-                    fileId=file_id,
-                    body=user_permission,
-                    sendNotificationEmail=False
-                ).execute()
-                
-                logger.info(f"Set writer permission for user: {user_email}")
-
-                # Then make service account the owner
-                owner_permission = {
-                    'type': 'user',
-                    'role': 'owner',
-                    'emailAddress': service_account_email,
-                    'transferOwnership': True
-                }
-                
-                self.drive_service.permissions().create(
-                    fileId=file_id,
-                    body=owner_permission,
-                    transferOwnership=True,
-                    sendNotificationEmail=True  # Required for ownership transfer
-                ).execute()
-                
-                logger.info(f"Set owner permission for service account: {service_account_email}")
-
-                # Verify permissions
-                permissions = self.drive_service.permissions().list(
-                    fileId=file_id,
-                    fields='permissions(id,emailAddress,role,type)'
-                ).execute()
-
-                logger.info("Current permissions:")
-                for permission in permissions.get('permissions', []):
-                    logger.info(f"- {permission.get('emailAddress')}: {permission.get('role')}")
-
-            except Exception as e:
-                logger.error(f"Error setting individual permission: {str(e)}")
-                
-                # Try alternative permission method
-                try:
-                    logger.info("Trying alternative permission method...")
-                    
-                    # Make file accessible to anyone with the link (as backup)
-                    anyone_permission = {
-                        'type': 'anyone',
-                        'role': 'writer',
-                        'allowFileDiscovery': False
-                    }
-                    
-                    self.drive_service.permissions().create(
-                        fileId=file_id,
-                        body=anyone_permission,
-                        sendNotificationEmail=False
-                    ).execute()
-                    
-                    logger.info("Set backup anyone-with-link permission")
-                    
-                except Exception as backup_error:
-                    logger.error(f"Backup permission method also failed: {str(backup_error)}")
-                    raise backup_error
-
-        except Exception as e:
-            logger.error(f"Error in _set_permissions: {str(e)}")
-            raise
 
     def check_duplicate_transaction(self, user_id: str, business_id: str, 
                                   transaction_data: Dict[str, Any]) -> bool:
