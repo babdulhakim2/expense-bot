@@ -7,6 +7,7 @@ from PIL import Image
 import time
 import io
 from config import Config
+from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -241,8 +242,9 @@ class GeminiService:
                 "category": specific category (Food, Transport, Shopping, etc.),
                 "payment_method": payment method used,
                 "transaction_id": receipt reference if available,
-                "merchant": store/vendor name if available,
-                "exchange_rate": rate used for conversion if applicable
+                "merchant": store/vendor name,
+                "exchange_rate": rate used for conversion if applicable,
+                "business_name": Business name of the account holder
             }}
 
             Example for direct GBP transaction:
@@ -258,6 +260,7 @@ class GeminiService:
                 "transaction_id": "",
                 "merchant": "Subway Oxford Street",
                 "exchange_rate": null
+                "business_name": "Anthropic Limited"
             }}
 
             Example for USD transaction:
@@ -272,7 +275,8 @@ class GeminiService:
                 "payment_method": "Credit Card",
                 "transaction_id": "AMZ-123456",
                 "merchant": "Amazon.com",
-                "exchange_rate": 0.79
+                "exchange_rate": 0.79,
+                "business_name": "Anthropic Inc."
             }}
 
             Message to analyze: {message}
@@ -281,7 +285,7 @@ class GeminiService:
             result = self.model.generate_content(
                 extract_prompt,
                 generation_config=genai.GenerationConfig(
-                    temperature=0.1,  # Lower temperature for more consistent output
+                    temperature=0.1, 
                     response_mime_type="application/json",
                     response_schema=Transaction
                 )
@@ -335,3 +339,33 @@ class GeminiService:
         except Exception as e:
             logger.error(f"Error processing CSV: {str(e)}", exc_info=True)
             return False, {}, "Sorry, I had trouble processing that CSV content"
+
+    def analyze_content(self, content: bytes, mime_type: str, prompt: str, 
+                       response_schema: Optional[Dict[str, Any]] = None) -> str:
+        """Analyze content with specific prompt and optional response schema"""
+        try:
+            generation_config = {
+                "temperature": 0.1,  # Lower temperature for more structured/consistent output
+                "response_mime_type": "application/json" if response_schema else "text/plain"
+            }
+            
+            if response_schema:
+                generation_config["response_schema"] = response_schema
+                
+            if mime_type.startswith('image/'):
+                image = Image.open(io.BytesIO(content))
+                result = self.model.generate_content(
+                    [prompt, image],
+                    generation_config=generation_config
+                )
+            else:
+                result = self.model.generate_content(
+                    [prompt, content],
+                    generation_config=generation_config
+                )
+            
+            return result.text
+            
+        except Exception as e:
+            logger.error(f"Error analyzing content: {str(e)}")
+            raise

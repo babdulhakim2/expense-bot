@@ -84,6 +84,7 @@ def whatsapp():
 
         # Get or create active business for user
         business = firebase_service.get_active_business(user['id'])
+        # TODO Use AI to get business context
         if not business:
             msg.body("Sorry, there was an error accessing your business account. Please try again later.")
             return str(resp)
@@ -97,6 +98,14 @@ def whatsapp():
                 'user_id': user['id'],
                 'business_id': business['id']
             }
+        )
+
+        # Record message received action
+        firebase_service.record_ai_action(
+            user_id=user['id'],
+            business_id=business['id'],
+            action_type='message_received',
+            action_data=incoming_message
         )
 
         if num_media > 0:
@@ -159,7 +168,7 @@ def whatsapp():
             if not is_transaction:
                 logger.info("Gemma text processing failed, falling back to Gemini")
                 is_transaction, transaction, response = gemini_service.extract_transaction(incoming_msg)
-        
+                logger.info(f"Transaction data: {transaction}")
         if not is_transaction:
             msg.body(response)
             # Store AI response
@@ -176,13 +185,48 @@ def whatsapp():
             )
             return str(resp)
 
-        # Get or create monthly folder
+        # Get transaction date
         transaction_date = datetime.strptime(transaction['transaction_date'], '%Y-%m-%d')
-        monthly_folder = firebase_service.get_or_create_monthly_folder(
+
+        # Get or create folder structure
+        business_folder = firebase_service.get_or_create_business_folder(
+            user_id=user['id'],
+            business_id=business['id']
+        )
+
+        transactions_folder = firebase_service.get_or_create_transactions_folder(
             user_id=user['id'],
             business_id=business['id'],
+            business_folder_id=business_folder['drive_id']
+        )
+
+        year_folder = firebase_service.get_or_create_year_folder(
+            user_id=user['id'],
+            business_id=business['id'],
+            transactions_folder_id=transactions_folder['drive_id']
+        )
+
+        # Get or create monthly spreadsheet
+        spreadsheet = firebase_service.get_or_create_monthly_spreadsheet(
+            user_id=user['id'],
+            business_id=business['id'],
+            year_folder_id=year_folder['drive_id'],
             date=transaction_date
         )
+
+        # NOW check for duplicates after we have the spreadsheet
+        if firebase_service.check_duplicate_transaction(
+            user_id=user['id'],
+            business_id=business['id'],
+            transaction_data={
+                'date': transaction['transaction_date'],
+                'amount': transaction['amount'],
+                'description': transaction['description'],
+                'spreadsheet_id': spreadsheet['spreadsheet_id']
+            }
+        ):
+            msg.body("⚠️ This transaction appears to be a duplicate. If this is a different transaction, please add more details to the description.")
+            return str(resp)
 
         # Record the expense
         expense = firebase_service.record_expense(
@@ -198,27 +242,27 @@ def whatsapp():
                 'orig_currency': transaction.get('orig_currency', 'GBP'),
                 'orig_amount': transaction.get('orig_amount', transaction['amount']),
                 'exchange_rate': transaction.get('exchange_rate', 1.0),
-                'folder_id': monthly_folder['id']
+                'spreadsheet_id': spreadsheet['spreadsheet_id']
             }
         )
 
         # Update the spreadsheet with the new expense
-        if monthly_folder.get('spreadsheet'):
-            firebase_service.update_expense_spreadsheet(
-                user_id=user['id'],
-                business_id=business['id'],
-                spreadsheet_id=monthly_folder['spreadsheet']['id'],
-                expense_data={
-                    'date': transaction['transaction_date'],
-                    'description': transaction['description'],
-                    'amount': transaction['amount'],
-                    'category': transaction['category'],
-                    'payment_method': transaction['payment_method'],
-                    'status': 'Completed',
-                    'action_id': expense['action_id'],
-                    'createdAt': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                }
-            )
+        firebase_service.update_expense_spreadsheet(
+            user_id=user['id'],
+            business_id=business['id'],
+            spreadsheet_id=spreadsheet['spreadsheet_id'],
+            expense_data={
+                'date': transaction['transaction_date'],
+                'description': transaction['description'],
+                'amount': transaction['amount'],
+                'category': transaction['category'],
+                'payment_method': transaction['payment_method'],
+                'status': 'Completed',
+                'transaction_id': expense['id'],
+                'merchant': transaction.get('merchant', 'N/A'),
+                'createdAt': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+        )
 
         # Format success response
         response_text = (
@@ -241,23 +285,25 @@ def whatsapp():
             f"📅 {transaction['transaction_date']}\n"
             f"🏷️ {transaction['category']}\n"
             f"💳 {transaction['payment_method']}\n"
-            f"🏪 {transaction.get('merchant', 'N/A')}\n\n"
+            f"🏷️ {transaction.get('merchant', 'N/A')}\n\n"
             f"📊 View your expenses at:\n"
-            f"https://expensebot.xyz/dashboard"
+            f"https://expensebot.xyz/dashboard\n\n"
         )
-        
-        if monthly_folder.get('folder_url'):
-            response_text += (
-                f"📂 View folder at:\n"
-                f"{monthly_folder['folder_url']}\n\n"
-            )
-        
-        if monthly_folder.get('spreadsheet', {}).get('url'):
+
+        # Add folder URLs
+        response_text += (
+            f"📂 Business folder:\n{business_folder['url']}\n\n"
+            f"📂 Transactions folder:\n{transactions_folder['url']}\n\n"
+            f"📂 Year folder:\n{year_folder['url']}\n\n"
+        )
+
+        # Add spreadsheet URL - use the direct URL from spreadsheet data
+        if spreadsheet.get('url'):  # Changed from spreadsheet.get('spreadsheet', {}).get('url')
             response_text += (
                 f"📊 View spreadsheet at:\n"
-                f"{monthly_folder['spreadsheet']['url']}\n\n"
+                f"{spreadsheet['url']}\n\n"
             )
-        
+
         # Store the final response message
         firebase_service.store_message(
             user_id=user['id'],
@@ -269,10 +315,26 @@ def whatsapp():
                 'related_message_id': stored_message['id'],
                 'transaction_data': transaction,
                 'expense_id': expense['id'],
-                'folder_id': monthly_folder['id'],
-                'spreadsheet_id': monthly_folder.get('spreadsheet', {}).get('id'),
+                'business_folder_id': business_folder['id'],
+                'transactions_folder_id': transactions_folder['id'],
+                'year_folder_id': year_folder['id'],
+                'spreadsheet_id': spreadsheet.get('spreadsheet', {}).get('id'),
                 'timestamp': datetime.now().isoformat()
             }
+        )
+
+        # Record message sent action
+        firebase_service.record_ai_action(
+            user_id=user['id'],
+            business_id=business['id'],
+            action_type='message_sent',
+            action_data={
+                'content': response_text,
+                'type': 'transaction_confirmation',
+                'transaction_id': expense['id'],
+                'platform': 'whatsapp'
+            },
+            related_id=expense['id']
         )
 
         msg.body(response_text)
