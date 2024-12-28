@@ -4,7 +4,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore, storage, auth
 from config import Config
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -12,6 +12,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import re
 from .google_drive_service import GoogleDriveService
+from google.cloud.firestore import AsyncClient
 
 # Google Sheets and Drive setup
 scope = [
@@ -51,7 +52,6 @@ class FirebaseService:
                 os.environ["FIREBASE_AUTH_EMULATOR_HOST"] = Config.FIREBASE_AUTH_EMULATOR_HOST
                 os.environ["FIREBASE_STORAGE_EMULATOR_HOST"] = Config.FIREBASE_STORAGE_EMULATOR_HOST
                 logger.info("Using Firebase emulators")
-                # Set storage emulator host for development
                 self.storage_host = f"http://{Config.FIREBASE_STORAGE_EMULATOR_HOST}"
                 self.is_emulated = True
             else:
@@ -65,11 +65,13 @@ class FirebaseService:
                 })
                 logger.info(f"Firebase initialized in {'development' if Config.IS_DEVELOPMENT else 'production'} mode")
 
-            self.db = firestore.client()
+            # Initialize both sync and async clients
+            self.db = firestore.client()  # Sync client
+            # self.db_async = AsyncClient()  # Async client
             self.auth = auth
             self.bucket = storage.bucket()
 
-            # Add Google Drive setup with renamed credentials variable
+            # Add Google Drive setup
             self.drive_credentials = service_account.Credentials.from_service_account_info(
                 json.loads(Config.SERVICE_ACCOUNT_KEY),
                 scopes=['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/spreadsheets']
@@ -103,7 +105,7 @@ class FirebaseService:
             uid = auth_user.uid
             # Now get user data from Firestore using the auth UID
             user_ref = self.db.collection('users').document(uid)
-            user = user_ref.get()
+            user = user_ref.get()  # This returns a DocumentSnapshot, not a coroutine
 
             if user.exists:
                 return {
@@ -1043,3 +1045,304 @@ class FirebaseService:
         
         # If more than 70% words match, consider it similar
         return overlap / total > 0.7 if total > 0 else False
+
+    def store_bank_connection(self, user_id: str, business_id: str, plaid_data: Dict, accounts: List[Dict]) -> str:
+        """Store bank connection details in Firestore"""
+        try:
+            logger.info(f"Storing bank connection for user {user_id}")
+            connection_ref = self.db.collection('bank_connections').document()
+            
+            # Create connection data
+            connection_data = {
+                'user_id': user_id,
+                'business_id': business_id,
+                'plaid_item_id': plaid_data['item_id'],
+                'access_token': plaid_data['access_token'],
+                'accounts': accounts,
+                'status': 'active',
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            # Store in Firestore
+            connection_ref.set(connection_data)
+            logger.info(f"Stored bank connection with ID: {connection_ref.id}")
+            
+            # Record the action
+            self.record_ai_action(
+                user_id=user_id,
+                business_id=business_id,
+                action_type='bank_connection_created',
+                action_data={
+                    'provider': 'plaid',
+                    'num_accounts': len(accounts),
+                    'connection_id': connection_ref.id
+                }
+            )
+            
+            return connection_ref.id
+            
+        except Exception as e:
+            logger.error(f"Error storing bank connection: {str(e)}")
+            raise
+
+    def get_bank_connection(self, connection_id: str) -> Optional[Dict[str, Any]]:
+        """Get bank connection details"""
+        try:
+            connection_ref = self.db.collection('bank_connections').document(connection_id)
+            connection = connection_ref.get()
+            
+            if not connection.exists:
+                return None
+            
+            return connection.to_dict()
+            
+        except Exception as e:
+            logger.error(f"Error getting bank connection: {str(e)}")
+            return None
+
+    def get_bank_connections(self, business_id: str) -> List[Dict[str, Any]]:
+        """Get all bank connections for a business"""
+        try:
+            connections_ref = self.db.collection('bank_connections')\
+                .where('business_id', '==', business_id)
+            
+            connections = []
+            for doc in connections_ref.stream():
+                connection_data = doc.to_dict()
+                connections.append({
+                    'id': doc.id,
+                    'bankName': connection_data.get('provider_name', 'Connected Bank'),
+                    'status': connection_data.get('status', 'active'),
+                    'lastSync': connection_data.get('last_sync'),
+                    'accountCount': len(connection_data.get('accounts', [])),
+                    'createdAt': connection_data.get('created_at'),
+                    'updatedAt': connection_data.get('updated_at')
+                })
+            
+            logger.info(f"Found {len(connections)} bank connections for business {business_id}")
+            return connections
+            
+        except Exception as e:
+            logger.error(f"Error getting bank connections: {str(e)}")
+            raise
+
+    def store_transactions(self, user_id: str, business_id: str, transactions: List[Dict[str, Any]]) -> None:
+        """Store bank transactions"""
+        try:
+            batch = self.db.batch()
+            
+            for transaction in transactions:
+                transaction_ref = self.db.collection('transactions').document()
+                transaction_data = {
+                    'user_id': user_id,
+                    'business_id': business_id,
+                    'plaid_transaction_id': transaction['id'],
+                    'amount': transaction['amount'],
+                    'date': transaction['date'],
+                    'description': transaction['description'],
+                    'category': transaction.get('category', 'Uncategorized'),
+                    'merchant': transaction.get('merchant', 'Unknown'),
+                    'status': 'pending' if transaction.get('pending', False) else 'completed',
+                    'created_at': datetime.now().isoformat(),
+                    'updated_at': datetime.now().isoformat()
+                }
+                batch.set(transaction_ref, transaction_data)
+            
+            batch.commit()
+            logger.info(f"Stored {len(transactions)} transactions")
+            
+        except Exception as e:
+            logger.error(f"Error storing transactions: {str(e)}")
+            raise
+
+    async def get_bank_connection(
+        self, 
+        user_id: str, 
+        business_id: str, 
+        connection_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Get bank connection details"""
+        try:
+            connection_ref = self.db.collection('users').document(user_id)\
+                .collection('businesses').document(business_id)\
+                .collection('bank_connections').document(connection_id)
+                
+            connection = await connection_ref.get()
+            
+            if not connection.exists:
+                return None
+            
+            connection_data = connection.to_dict()
+            
+            # Decrypt sensitive data
+            connection_data['access_token'] = self._decrypt_sensitive_data(
+                connection_data['access_token']
+            )
+            connection_data['refresh_token'] = self._decrypt_sensitive_data(
+                connection_data['refresh_token']
+            )
+            
+            return connection_data
+            
+        except Exception as e:
+            logger.error(f"Error getting bank connection: {str(e)}")
+            return None
+
+    async def update_bank_tokens(
+        self, 
+        user_id: str, 
+        business_id: str,
+        connection_id: str,
+        tokens: Dict[str, Any]
+    ) -> None:
+        """Update bank connection tokens"""
+        try:
+            connection_ref = self.db.collection('users').document(user_id)\
+                .collection('businesses').document(business_id)\
+                .collection('bank_connections').document(connection_id)
+                
+            await connection_ref.update({
+                'access_token': self._encrypt_sensitive_data(tokens['access_token']),
+                'refresh_token': self._encrypt_sensitive_data(tokens['refresh_token']),
+                'expires_at': datetime.now() + timedelta(seconds=tokens['expires_in']),
+                'updated_at': firestore.SERVER_TIMESTAMP
+            })
+            
+        except Exception as e:
+            logger.error(f"Error updating bank tokens: {str(e)}")
+            raise
+
+    async def is_transaction_synced(
+        self, 
+        user_id: str, 
+        business_id: str,
+        bank_transaction_id: str
+    ) -> bool:
+        """Check if a bank transaction has already been synced"""
+        try:
+            transactions = self.db.collection('users').document(user_id)\
+                .collection('businesses').document(business_id)\
+                .collection('transactions')\
+                .where('bank_transaction_id', '==', bank_transaction_id)\
+                .limit(1)\
+                .stream()
+                
+            return len(list(transactions)) > 0
+                
+        except Exception as e:
+            logger.error(f"Error checking transaction sync status: {str(e)}")
+            return False
+
+    def _encrypt_sensitive_data(self, data: str) -> str:
+        """Encrypt sensitive data before storing"""
+        # TODO: Implement proper encryption
+        # For now, just return the data as-is
+        return data
+
+    def _decrypt_sensitive_data(self, encrypted_data: str) -> str:
+        """Decrypt sensitive data"""
+        # TODO: Implement proper decryption
+        # For now, just return the data as-is
+        return encrypted_data
+
+    async def get_bank_connections(self, business_id: str) -> List[Dict[str, Any]]:
+        """Get all bank connections for a business"""
+        try:
+            # Update the collection path to match the structure
+            connections_ref = self.db.collection('businesses').document(business_id)\
+                .collection('bank_connections')
+            
+            connections = []
+            async for doc in connections_ref.stream():
+                connection_data = doc.to_dict()
+                # Format the connection data for frontend
+                connections.append({
+                    'id': doc.id,
+                    'bankName': connection_data.get('provider_name', 'Unknown Bank'),
+                    'status': connection_data.get('status', 'inactive'),
+                    'lastSync': connection_data.get('last_sync'),
+                    'accountCount': len(connection_data.get('accounts', [])),
+                    'createdAt': connection_data.get('created_at'),
+                    'updatedAt': connection_data.get('updated_at')
+                })
+            
+            logger.info(f"Found {len(connections)} bank connections for business {business_id}")
+            return connections
+            
+        except Exception as e:
+            logger.error(f"Error getting bank connections: {str(e)}")
+            raise
+
+    async def get_connection_by_account(self, account_id: str) -> Optional[Dict[str, Any]]:
+        """Get connection details by account ID"""
+        try:
+            connections = self.db.collection_group('bank_connections')\
+                .where('accounts', 'array_contains', {'id': account_id})\
+                .limit(1)
+            
+            async for doc in connections.stream():
+                business_id = doc.reference.parent.parent.id
+                return {
+                    'id': doc.id,
+                    'business_id': business_id,
+                    **doc.to_dict()
+                }
+            return None
+        except Exception as e:
+            logger.error(f"Error getting connection by account: {str(e)}")
+            raise
+
+    async def update_connection_sync_time(self, business_id: str, connection_id: str):
+        """Update last sync time for a connection"""
+        try:
+            connection_ref = self.db.collection('businesses').document(business_id)\
+                .collection('bank_connections').document(connection_id)
+            
+            await connection_ref.update({
+                'last_sync': firestore.SERVER_TIMESTAMP,
+                'updated_at': firestore.SERVER_TIMESTAMP
+            })
+        except Exception as e:
+            logger.error(f"Error updating connection sync time: {str(e)}")
+            raise
+
+    async def update_connection_status(self, business_id: str, connection_id: str, status: str):
+        """Update connection status"""
+        try:
+            connection_ref = self.db.collection('businesses').document(business_id)\
+                .collection('bank_connections').document(connection_id)
+            
+            await connection_ref.update({
+                'status': status,
+                'updated_at': firestore.SERVER_TIMESTAMP
+            })
+        except Exception as e:
+            logger.error(f"Error updating connection status: {str(e)}")
+            raise
+
+    async def delete_auth_state(self, state: str) -> None:
+        """Delete used OAuth state"""
+        try:
+            await self.db.collection('auth_states').document(state).delete()
+            logger.info(f"Deleted auth state: {state}")
+        except Exception as e:
+            logger.error(f"Error deleting auth state: {str(e)}")
+            # Don't raise here as this is cleanup
+
+    def get_user_registration_url(self) -> str:
+        """Get the URL for user registration"""
+        try:
+            # Get the base URL from config
+            base_url = Config.FRONTEND_URL or 'http://localhost:3000'
+            
+            # Create a registration URL with a unique token
+            registration_url = f"{base_url}"
+            
+            logger.info(f"Generated registration URL: {registration_url}")
+            return registration_url
+            
+        except Exception as e:
+            logger.error(f"Error generating registration URL: {str(e)}")
+            # Return a default URL if there's an error
+            return "https://expensebot.xyz"

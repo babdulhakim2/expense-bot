@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from twilio.twiml.messaging_response import MessagingResponse
 import requests
 from dotenv import load_dotenv
@@ -13,6 +13,14 @@ from config import Config
 from google.cloud import secretmanager
 import wandb
 from services.firebase_service import FirebaseService
+from plaid.api import plaid_api
+from plaid.model.link_token_create_request import LinkTokenCreateRequest
+from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
+from plaid.model.products import Products
+from plaid.model.country_code import CountryCode
+from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchangeRequest
+from services.plaid_service import PlaidService
+from flask_cors import CORS
 
 load_dotenv()  # take environment variables from .env.
 
@@ -25,10 +33,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+# CORS(app, resources={
+#     r"/api/*": {
+#         "origins": ["http://localhost:3000"],
+#         "methods": ["POST", "OPTIONS"],
+#         "allow_headers": ["Content-Type", "Accept"]
+#     }
+# })
 
 # Initialize services with config
 gemma2_service = Gemma2Service()  # Primary service
 gemini_service = GeminiService()  # Fallback service
+plaid_service = PlaidService()
 
 # Dictionary to maintain chat history per user
 chat_sessions = {}
@@ -68,18 +84,11 @@ def whatsapp():
         if not user:
             registration_url = firebase_service.get_user_registration_url()
             msg.body(
-                "👋 Welcome to ExpenseBot!\n\n"
+                 "👋 Welcome to ExpenseBot!\n\n"
                 "It looks like you haven't registered yet. "
                 f"Please create an account at:\n{registration_url}\n\n"
                 "Once registered, you can start tracking your expenses!"
             )
-            
-            # Store unregistered user message
-            # firebase_service.store_message(
-            #     user_id='system',
-            #     business_id='registration',
-            #     message_data=incoming_message
-            # )
             return str(resp)
 
         # Get or create active business for user
@@ -407,7 +416,143 @@ def access_secret_version(project_id, secret_id):
         logger.error(f"Error accessing secret {secret_id}: {str(e)}")
         raise
 
+@app.route('/api/banking/plaid/create_link_token', methods=['POST', 'OPTIONS'])
+def create_link_token():
+    # Handle preflight request
+    if request.method == 'OPTIONS':
+        return '', 204
+        
+    try:
+        logger.info("Received create_link_token request")
+        logger.info(f"Headers: {dict(request.headers)}")
+        
+        data = request.get_json()
+        logger.info(f"Request data: {data}")
+        
+        if not data:
+            logger.error("No JSON data provided")
+            return jsonify({"error": "No JSON data provided"}), 400
+            
+        user_id = data.get('user_id')
+        if not user_id:
+            logger.error("User ID is required")
+            return jsonify({"error": "User ID is required"}), 400
+            
+        logger.info(f"Creating link token for user {user_id}")
+        token_data = plaid_service.create_link_token(user_id)
+        logger.info(f"Created link token: {token_data}")
+        
+        return jsonify(token_data)
+        
+    except Exception as e:
+        logger.error(f"Error creating link token: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/banking/plaid/exchange_token', methods=['POST', 'OPTIONS'])
+def exchange_token():
+    # Handle preflight request
+    if request.method == 'OPTIONS':
+        return '', 204
+        
+    try:
+        logger.info("Received exchange_token request")
+        logger.info(f"Headers: {dict(request.headers)}")
+        
+        data = request.get_json()
+        logger.info(f"Request data: {data}")
+        
+        public_token = data.get('public_token')
+        user_id = data.get('user_id')
+        business_id = data.get('business_id')
+        
+        if not all([public_token, user_id, business_id]):
+            return jsonify({"error": "Missing required parameters"}), 400
+            
+        try:
+            # Exchange public token for access token
+            plaid_data = plaid_service.exchange_public_token(public_token)
+            logger.info("Exchanged public token for access token")
+            
+            # Get accounts
+            accounts = plaid_service.get_accounts(plaid_data['access_token'])
+            logger.info(f"Retrieved {len(accounts)} accounts")
+            
+            # Store in Firebase
+            connection_id = firebase_service.store_bank_connection(
+                user_id=user_id,
+                business_id=business_id,
+                plaid_data={
+                    'access_token': plaid_data['access_token'],
+                    'item_id': plaid_data['item_id']
+                },
+                accounts=accounts
+            )
+            
+            logger.info(f"Stored bank connection with ID: {connection_id}")
+            
+            # Return connection details
+            return jsonify({
+                "connection_id": connection_id,
+                "bank_name": accounts[0].get('name', 'Connected Bank'),
+                "account_count": len(accounts),
+                "status": "success",
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            })
+            
+        except plaid.ApiException as e:
+            logger.error(f"Plaid API error: {str(e)}")
+            return jsonify({"error": str(e)}), 400
+            
+    except Exception as e:
+        logger.error(f"Error exchanging token: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/banking/plaid/sync', methods=['POST'])
+async def sync_transactions():
+    try:
+        data = await request.get_json()
+        connection_id = data.get('connection_id')
+        
+        if not connection_id:
+            return jsonify({"error": "Connection ID is required"}), 400
+            
+        # Get connection details from Firebase
+        connection = await firebase_service.get_bank_connection(connection_id)
+        if not connection:
+            return jsonify({"error": "Connection not found"}), 404
+            
+        # Get transactions from Plaid
+        start_date = datetime.now() - timedelta(days=30)  # Last 30 days
+        transactions = await plaid_service.get_transactions(
+            connection['access_token'],
+            start_date
+        )
+        
+        # Store transactions in Firebase
+        await firebase_service.store_transactions(
+            user_id=connection['user_id'],
+            business_id=connection['business_id'],
+            transactions=transactions
+        )
+        
+        return jsonify({
+            "status": "success",
+            "transaction_count": len(transactions),
+            "sync_time": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error syncing transactions: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat()
+    })
+
 if __name__ == '__main__':
-    # app.run(host='0.0.0.0', port=9004, debug=True)
     port = int(os.environ.get('PORT', 9004))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=True)

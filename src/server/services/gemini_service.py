@@ -215,7 +215,12 @@ class GeminiService:
             is_transaction = 'YES' in check_result.text.upper()
 
             if not is_transaction:
-                return False, {}, "This doesn't seem to be a transaction. Please provide a screenshot of a receipt or invoice."
+                return False, {}, """I don't see any transaction details in that message. Here's what you can do:
+
+1. Send a photo of a receipt or invoice
+2. Share a PDF document containing transaction details
+
+I'll help you record your expenses and organize them automatically!"""
 
             # Extract transaction details
             extract_prompt = f"""Extract transaction details from this message.
@@ -369,3 +374,5 @@ class GeminiService:
         except Exception as e:
             logger.error(f"Error analyzing content: {str(e)}")
             raise
+
+    

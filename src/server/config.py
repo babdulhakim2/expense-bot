@@ -47,6 +47,21 @@ class Config:
     FIREBASE_FIRESTORE_EMULATOR_HOST = os.getenv('FIREBASE_FIRESTORE_EMULATOR_HOST', 'localhost:8080')
     FIREBASE_STORAGE_EMULATOR_HOST = os.getenv('FIREBASE_STORAGE_EMULATOR_HOST', 'localhost:9199')
     
+    # Plaid Configuration
+    PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
+    PLAID_SECRET = os.getenv('PLAID_SECRET')
+    PLAID_ENV = os.getenv('PLAID_ENV', 'sandbox')
+    PLAID_REDIRECT_URI = os.getenv('PLAID_REDIRECT_URI', 'http://localhost:3000/banking/callback')
+    
+    # Encryption
+    ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY')  # Must be 32 bytes for Fernet
+    
+    # Webhook
+    TRUELAYER_WEBHOOK_SECRET = os.getenv('TRUELAYER_WEBHOOK_SECRET')
+    
+    # Frontend URLs
+    FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    
     @classmethod
     def validate_config(cls):
         """Validate required configuration values"""
@@ -83,6 +98,22 @@ class Config:
         
         # Set additional config values
         cls.GOOGLE_SERVICE_ACCOUNT_KEY = cls.SERVICE_ACCOUNT_KEY
+        
+        required_vars = [
+            # ('TRUELAYER_CLIENT_ID', cls.TRUELAYER_CLIENT_ID),
+            # ('TRUELAYER_CLIENT_SECRET', cls.TRUELAYER_CLIENT_SECRET),
+            # ('TRUELAYER_REDIRECT_URI', cls.TRUELAYER_REDIRECT_URI),
+        ]
+        
+        missing = [var[0] for var in required_vars if not var[1]]
+        
+        if missing:
+            raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
+
+    @classmethod
+    def get_frontend_url(cls, path: str) -> str:
+        """Get full frontend URL for a path"""
+        return f"{cls.FRONTEND_URL}{path}"
 
 # Load and validate configuration
 Config.validate_config()
