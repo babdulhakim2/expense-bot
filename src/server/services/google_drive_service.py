@@ -6,8 +6,22 @@ import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from typing import Optional, Dict, Any
+from googleapiclient.http import MediaIoBaseUpload
+import io
+import httplib2
+import socket
+import ssl
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
+
+class CustomHTTPAdapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        context = ssl.create_default_context()
+        context.set_ciphers('DEFAULT@SECLEVEL=1')  # Less strict SSL
+        kwargs['ssl_context'] = context
+        return super(CustomHTTPAdapter, self).init_poolmanager(*args, **kwargs)
 
 class GoogleDriveService:
     def __init__(self):
@@ -26,9 +40,22 @@ class GoogleDriveService:
             service_account_file.close()
             
             # Initialize credentials
-            self.creds = ServiceAccountCredentials.from_json_keyfile_name(service_account_file.name, scope)
+            self.creds = ServiceAccountCredentials.from_json_keyfile_name(
+                service_account_file.name, 
+                scope
+            )
+            
+            # Create authorized http object
+            authorized_http = self.creds.authorize(httplib2.Http(timeout=30))
+            
+            # Initialize services
+            self.drive_service = build(
+                'drive', 
+                'v3', 
+                http=authorized_http
+            )
+            
             self.sheets_client = gspread.authorize(self.creds)
-            self.drive_service = build('drive', 'v3', credentials=self.creds)
             
         except Exception as e:
             logger.error(f"Failed to initialize Google Drive service: {str(e)}")
@@ -36,29 +63,40 @@ class GoogleDriveService:
 
     def create_folder(self, folder_name: str, parent_id: Optional[str] = None) -> Dict[str, Any]:
         """Create a folder in Google Drive"""
-        try:
-            folder_metadata = {
-                'name': folder_name,
-                'mimeType': 'application/vnd.google-apps.folder'
-            }
-            
-            if parent_id:
-                folder_metadata['parents'] = [parent_id]
-            
-            drive_folder = self.drive_service.files().create(
-                body=folder_metadata,
-                fields='id, name, webViewLink'
-            ).execute()
-            
-            return {
-                'id': drive_folder.get('id'),
-                'name': drive_folder.get('name'),
-                'url': drive_folder.get('webViewLink')
-            }
-            
-        except Exception as e:
-            logger.error(f"Error creating folder: {str(e)}")
-            raise
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                folder_metadata = {
+                    'name': folder_name,
+                    'mimeType': 'application/vnd.google-apps.folder'
+                }
+                
+                if parent_id:
+                    folder_metadata['parents'] = [parent_id]
+                
+                drive_folder = self.drive_service.files().create(
+                    body=folder_metadata,
+                    fields='id, name, webViewLink'
+                ).execute()
+                
+                return {
+                    'id': drive_folder.get('id'),
+                    'name': drive_folder.get('name'),
+                    'url': drive_folder.get('webViewLink')
+                }
+                
+            except ssl.SSLError as e:
+                retry_count += 1
+                logger.warning(f"SSL Error (attempt {retry_count}/{max_retries}): {str(e)}")
+                if retry_count == max_retries:
+                    raise
+                continue
+                
+            except Exception as e:
+                logger.error(f"Error creating folder: {str(e)}")
+                raise
 
     def create_spreadsheet(self, name: str, parent_folder_id: str) -> Dict[str, Any]:
         """Create a new spreadsheet in Google Drive"""
@@ -249,4 +287,46 @@ class GoogleDriveService:
             
         except Exception as e:
             logger.error(f"Error getting file: {str(e)}")
+            raise 
+
+    def file_exists(self, file_id: str) -> bool:
+        """Check if a file/folder exists in Drive"""
+        try:
+            self.drive_service.files().get(
+                fileId=file_id,
+                fields='id'
+            ).execute()
+            return True
+        except Exception:
+            return False 
+
+    def upload_file(self, file_content: bytes, file_name: str, 
+                    mime_type: str, parent_folder_id: str) -> Dict[str, Any]:
+        """Upload file to Google Drive"""
+        try:
+            file_metadata = {
+                'name': file_name,
+                'parents': [parent_folder_id]
+            }
+            
+            media = MediaIoBaseUpload(
+                io.BytesIO(file_content),
+                mimetype=mime_type,
+                resumable=True
+            )
+            
+            file = self.drive_service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id, name, webViewLink'
+            ).execute()
+            
+            return {
+                'id': file.get('id'),
+                'name': file.get('name'),
+                'url': file.get('webViewLink')
+            }
+            
+        except Exception as e:
+            logger.error(f"Error uploading file: {str(e)}")
             raise 

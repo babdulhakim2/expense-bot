@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from twilio.twiml.messaging_response import MessagingResponse
 import requests
 from dotenv import load_dotenv
@@ -7,12 +7,12 @@ import weave
 import datetime
 import logging
 from datetime import datetime
-from services.gemma2_service import Gemma2Service
-from services.gemini_service import GeminiService
+from services.ai_service import AIService
 from config import Config
 from google.cloud import secretmanager
 import wandb
 from services.firebase_service import FirebaseService
+from twilio.rest import Client
 
 load_dotenv()  # take environment variables from .env.
 
@@ -27,8 +27,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # Initialize services with config
-gemma2_service = Gemma2Service()  # Primary service
-gemini_service = GeminiService()  # Fallback service
+gemini_service = AIService()  # Primary service now
 
 # Dictionary to maintain chat history per user
 chat_sessions = {}
@@ -37,6 +36,9 @@ chat_sessions = {}
 
 # Initialize Firebase service
 firebase_service = FirebaseService()
+
+# Initialize Twilio client
+twilio_client = Client(Config.TWILIO_ACCOUNT_SID, Config.TWILIO_AUTH_TOKEN)
 
 @app.route('/whatsapp', methods=['POST'])
 def whatsapp():
@@ -66,20 +68,15 @@ def whatsapp():
         print(f"Checking if user exists: {phone_number}")
         user = firebase_service.get_user_by_phone(phone_number)
         if not user:
-            registration_url = firebase_service.get_user_registration_url()
+            registration_url = 'https://expensebot.xyz'
             msg.body(
                 "👋 Welcome to ExpenseBot!\n\n"
                 "It looks like you haven't registered yet. "
-                f"Please create an account at:\n{registration_url}\n\n"
-                "Once registered, you can start tracking your expenses!"
+                f"Please create an account and register your Phone Number at:\n{registration_url}\n\n"
+                "Once registered, you can start tracking your expenses using Whatsapp!"
             )
             
-            # Store unregistered user message
-            # firebase_service.store_message(
-            #     user_id='system',
-            #     business_id='registration',
-            #     message_data=incoming_message
-            # )
+
             return str(resp)
 
         # Get or create active business for user
@@ -91,7 +88,6 @@ def whatsapp():
 
         # Store the incoming message with user context
         stored_message = firebase_service.store_message(
-            user_id=user['id'],
             business_id=business['id'],
             message_data={
                 **incoming_message,
@@ -102,7 +98,6 @@ def whatsapp():
 
         # Record message received action
         firebase_service.record_ai_action(
-            user_id=user['id'],
             business_id=business['id'],
             action_type='message_received',
             action_data=incoming_message
@@ -121,7 +116,6 @@ def whatsapp():
                 if media_response.status_code == 200:
                     # Store media content in Firebase Storage
                     firebase_service.store_message(
-                        user_id=user['id'],
                         business_id=business['id'],
                         message_data={
                             **stored_message,
@@ -130,26 +124,12 @@ def whatsapp():
                         }
                     )
 
-                # Try Gemma first
-                try:
-                    is_transaction, transaction, response = gemma2_service.process_media(
-                        media_response.content,
-                        media_type,
-                        incoming_msg
-                    )
-                except Exception as e:
-                    logger.error(f"Gemma media processing failed: {str(e)}")
-                    is_transaction = False
-                    response = str(e)
-                
-                # Fall back to Gemini if Gemma fails
-                if not is_transaction:
-                    logger.info("Gemma processing failed, falling back to Gemini")
-                    is_transaction, transaction, response = gemini_service.process_media(
-                        media_response.content,
-                        media_type,
-                        incoming_msg
-                    )
+                # Use only Gemini for processing
+                is_transaction, transaction, response = gemini_service.process_media(
+                    media_response.content,
+                    media_type,
+                    incoming_msg
+                )
                     
             except Exception as e:
                 logger.error(f"Error processing media: {str(e)}", exc_info=True)
@@ -157,23 +137,13 @@ def whatsapp():
                 return str(resp)
         
         else:
-            # Try Gemma first for text processing
-            try:
-                is_transaction, transaction, response = gemma2_service.extract_transaction(incoming_msg)
-            except Exception as e:
-                logger.error(f"Gemma text processing failed: {str(e)}")
-                is_transaction = False
-            
-            # Fall back to Gemini if Gemma fails
-            if not is_transaction:
-                logger.info("Gemma text processing failed, falling back to Gemini")
-                is_transaction, transaction, response = gemini_service.extract_transaction(incoming_msg)
-                logger.info(f"Transaction data: {transaction}")
+            # Use only Gemini for text processing
+            is_transaction, transaction, response = gemini_service.extract_transaction(incoming_msg)
+            logger.info(f"Transaction data: {transaction}")
         if not is_transaction:
             msg.body(response)
             # Store AI response
             firebase_service.store_message(
-                user_id=user['id'],
                 business_id=business['id'],
                 message_data={
                     'direction': 'outbound',
@@ -187,28 +157,26 @@ def whatsapp():
 
         # Get transaction date
         transaction_date = datetime.strptime(transaction['transaction_date'], '%Y-%m-%d')
+        transaction_year = transaction_date.strftime('%Y')
 
         # Get or create folder structure
         business_folder = firebase_service.get_or_create_business_folder(
-            user_id=user['id'],
             business_id=business['id']
         )
 
         transactions_folder = firebase_service.get_or_create_transactions_folder(
-            user_id=user['id'],
             business_id=business['id'],
             business_folder_id=business_folder['drive_id']
         )
 
         year_folder = firebase_service.get_or_create_year_folder(
-            user_id=user['id'],
             business_id=business['id'],
+            transaction_year=transaction_year,
             transactions_folder_id=transactions_folder['drive_id']
         )
 
         # Get or create monthly spreadsheet
         spreadsheet = firebase_service.get_or_create_monthly_spreadsheet(
-            user_id=user['id'],
             business_id=business['id'],
             year_folder_id=year_folder['drive_id'],
             date=transaction_date
@@ -216,7 +184,6 @@ def whatsapp():
 
         # NOW check for duplicates after we have the spreadsheet
         if firebase_service.check_duplicate_transaction(
-            user_id=user['id'],
             business_id=business['id'],
             transaction_data={
                 'date': transaction['transaction_date'],
@@ -225,12 +192,45 @@ def whatsapp():
                 'spreadsheet_id': spreadsheet['spreadsheet_id']
             }
         ):
-            msg.body("⚠️ This transaction appears to be a duplicate. If this is a different transaction, please add more details to the description.")
-            return str(resp)
+            duplicate_msg = "⚠️ This transaction appears to be a duplicate. If this is a different transaction, please add more details to the description."
+            
+            # Send message directly via Twilio instead of using MessagingResponse
+            twilio_client.messages.create(
+                from_=f'whatsapp:{Config.TWILIO_PHONE_NUMBER}',
+                body=duplicate_msg,
+                to=user_id  # user_id already contains the whatsapp: prefix
+            )
+            
+            # Store the duplicate warning message
+            firebase_service.store_message(
+                business_id=business['id'],
+                message_data={
+                    'direction': 'outbound',
+                    'content': duplicate_msg,
+                    'type': 'duplicate_warning',
+                    'related_message_id': stored_message['id'],
+                    'timestamp': datetime.now().isoformat()
+                }
+            )
+            
+            # Record the duplicate detection action
+            firebase_service.record_ai_action(
+                business_id=business['id'],
+                action_type='transaction_duplicate',
+                action_data={
+                    'original_message': incoming_msg,
+                    'duplicate_details': {
+                        'date': transaction['transaction_date'],
+                        'amount': transaction['amount'],
+                        'description': transaction['description']
+                    }
+                }
+            )
+            
+            return str(MessagingResponse())  # Return empty response since we sent message directly
 
         # Record the expense
         expense = firebase_service.record_expense(
-            user_id=user['id'],
             business_id=business['id'],
             expense_data={
                 'date': transaction['transaction_date'],
@@ -248,7 +248,6 @@ def whatsapp():
 
         # Update the spreadsheet with the new expense
         firebase_service.update_expense_spreadsheet(
-            user_id=user['id'],
             business_id=business['id'],
             spreadsheet_id=spreadsheet['spreadsheet_id'],
             expense_data={
@@ -306,7 +305,6 @@ def whatsapp():
 
         # Store the final response message
         firebase_service.store_message(
-            user_id=user['id'],
             business_id=business['id'],
             message_data={
                 'direction': 'outbound',
@@ -325,7 +323,6 @@ def whatsapp():
 
         # Record message sent action
         firebase_service.record_ai_action(
-            user_id=user['id'],
             business_id=business['id'],
             action_type='message_sent',
             action_data={
@@ -337,8 +334,80 @@ def whatsapp():
             related_id=expense['id']
         )
 
-        msg.body(response_text)
-        return str(resp)
+        # Store the document if we have media
+        if num_media > 0:
+            try:
+                logger.info("Starting document storage process...")
+                
+                # Get business folder first
+                business_folder = firebase_service.get_or_create_business_folder(
+                    business_id=business['id']
+                )
+                logger.debug(f"Got business folder: {business_folder['id']}")
+                
+                # Detect document type
+                logger.debug(f"Detecting document type for media type: {media_type}")
+                document_type, document_date = gemini_service._detect_document_type(
+                    media_response.content,
+                    media_type
+                )
+                logger.info(f"Detected document type: {document_type}, date: {document_date}")
+
+                # Store document with metadata
+                logger.debug("Preparing to store document...")
+                stored_document = firebase_service.store_document(
+                    business_id=business['id'],
+                    document_type=document_type,
+                    file_content=media_response.content,
+                    mime_type=media_type,
+                    date=document_date,
+                    metadata={
+                        'expense_id': expense['id'],
+                        'transaction_date': transaction['transaction_date'],
+                        'amount': transaction['amount'],
+                        'description': transaction['description'],
+                        'category': transaction['category'],
+                        'merchant': transaction.get('merchant', 'N/A'),
+                        'business_folder_id': business_folder['drive_id']
+                    }
+                )
+                logger.info(f"Document stored successfully: {stored_document['url']}")
+
+                # Add document info to response
+                response_text += f"\n\n📄 Document stored as {document_type}\n"
+                response_text += f"📂 View at: {stored_document['url']}"
+
+                # Record document storage action
+                logger.debug("Recording document storage action...")
+                firebase_service.record_ai_action(
+                    business_id=business['id'],
+                    action_type='document_stored',
+                    action_data={
+                        'document_type': document_type,
+                        'document_url': stored_document['url'],
+                        'expense_id': expense['id'],
+                        'mime_type': media_type
+                    },
+                    related_id=expense['id']
+                )
+                logger.info("Document storage process completed successfully")
+
+            except Exception as e:
+                logger.error(f"Error storing document: {str(e)}", exc_info=True)
+                # Log the full traceback for debugging
+                import traceback
+                logger.error(f"Full traceback: {traceback.format_exc()}")
+                response_text += "\n\n⚠️ Transaction recorded but couldn't store the document."
+
+        # Continue with existing code for sending response
+        twilio_client.messages.create(
+            from_=f'whatsapp:{Config.TWILIO_PHONE_NUMBER}',
+            body=response_text,
+            to=user_id
+        )
+
+        # Return empty response since we sent message directly
+        return str(MessagingResponse())
         
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}", exc_info=True)
@@ -347,7 +416,6 @@ def whatsapp():
         # Store error message if we have user context
         if 'user' in locals() and 'business' in locals():
             firebase_service.store_message(
-                user_id=user['id'],
                 business_id=business['id'],
                 message_data={
                     'direction': 'outbound',
@@ -361,6 +429,164 @@ def whatsapp():
         msg = MessagingResponse().message()
         msg.body(error_msg)
         return str(msg)
+
+@app.route('/api/upload', methods=['POST'])
+def upload_file():
+    try:
+        # Check if file is present in request
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+            
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        # Get business_id from request
+        business_id = request.form.get('businessId')
+        if not business_id:
+            return jsonify({'error': 'Business ID is required'}), 400
+
+        # Get the file content and MIME type
+        file_content = file.read()
+        mime_type = file.content_type
+
+        # Get business folder
+        business_folder = firebase_service.get_or_create_business_folder(
+            business_id=business_id
+        )
+        logger.debug(f"Got business folder: {business_folder['id']}")
+
+        # Use Gemini to detect document type and extract transaction data
+        is_transaction, transaction, ai_response = gemini_service.process_media(
+            file_content,
+            mime_type,
+            ""  # No additional message for uploaded files
+        )
+
+        # Detect document type
+        document_type, document_date = gemini_service._detect_document_type(
+            file_content,
+            mime_type
+        )
+        logger.info(f"Detected document type: {document_type}, date: {document_date}")
+
+        # If it's a valid transaction, process it
+        if is_transaction:
+            # Get transaction date
+            transaction_date = datetime.strptime(transaction['transaction_date'], '%Y-%m-%d')
+            transaction_year = transaction_date.strftime('%Y')
+
+            # Create folder structure
+            transactions_folder = firebase_service.get_or_create_transactions_folder(
+                business_id=business_id,
+                business_folder_id=business_folder['drive_id']
+            )
+
+            year_folder = firebase_service.get_or_create_year_folder(
+                business_id=business_id,
+                transaction_year=transaction_year,
+                transactions_folder_id=transactions_folder['drive_id']
+            )
+
+            # Get or create monthly spreadsheet
+            spreadsheet = firebase_service.get_or_create_monthly_spreadsheet(
+                business_id=business_id,
+                year_folder_id=year_folder['drive_id'],
+                date=transaction_date
+            )
+
+            # Record the expense
+            expense = firebase_service.record_expense(
+                business_id=business_id,
+                expense_data={
+                    'date': transaction['transaction_date'],
+                    'amount': transaction['amount'],
+                    'description': transaction['description'],
+                    'category': transaction['category'],
+                    'payment_method': transaction['payment_method'],
+                    'merchant': transaction.get('merchant', 'N/A'),
+                    'orig_currency': transaction.get('orig_currency', 'GBP'),
+                    'orig_amount': transaction.get('orig_amount', transaction['amount']),
+                    'exchange_rate': transaction.get('exchange_rate', 1.0),
+                    'spreadsheet_id': spreadsheet['spreadsheet_id']
+                }
+            )
+
+            # Update spreadsheet
+            firebase_service.update_expense_spreadsheet(
+                business_id=business_id,
+                spreadsheet_id=spreadsheet['spreadsheet_id'],
+                expense_data={
+                    'date': transaction['transaction_date'],
+                    'description': transaction['description'],
+                    'amount': transaction['amount'],
+                    'category': transaction['category'],
+                    'payment_method': transaction['payment_method'],
+                    'status': 'Completed',
+                    'transaction_id': expense['id'],
+                    'merchant': transaction.get('merchant', 'N/A'),
+                    'createdAt': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+            )
+
+        # Store the document
+        stored_document = firebase_service.store_document(
+            business_id=business_id,
+            document_type=document_type,
+            file_content=file_content,
+            mime_type=mime_type,
+            date=document_date,
+            metadata={
+                'expense_id': expense['id'] if is_transaction else None,
+                'transaction_date': transaction['transaction_date'] if is_transaction else document_date,
+                'amount': transaction.get('amount') if is_transaction else None,
+                'description': transaction.get('description') if is_transaction else None,
+                'category': transaction.get('category') if is_transaction else None,
+                'merchant': transaction.get('merchant', 'N/A') if is_transaction else None,
+                'business_folder_id': business_folder['drive_id']
+            }
+        )
+
+        # Record document storage action
+        firebase_service.record_ai_action(
+            business_id=business_id,
+            action_type='document_stored',
+            action_data={
+                'document_type': document_type,
+                'document_url': stored_document['url'],
+                'expense_id': expense['id'] if is_transaction else None,
+                'mime_type': mime_type,
+                'is_transaction': is_transaction
+            },
+            related_id=expense['id'] if is_transaction else None
+        )
+
+        # Prepare response
+        response_data = {
+            'success': True,
+            'document': {
+                'url': stored_document['url'],
+                'type': document_type,
+                'date': document_date
+            }
+        }
+
+        if is_transaction:
+            response_data['transaction'] = {
+                'id': expense['id'],
+                'date': transaction['transaction_date'],
+                'amount': transaction['amount'],
+                'description': transaction['description'],
+                'category': transaction['category'],
+                'payment_method': transaction['payment_method'],
+                'merchant': transaction.get('merchant', 'N/A')
+            }
+
+        return jsonify(response_data), 200
+
+    except Exception as e:
+        logger.error(f"Error processing file upload: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 wandb_enabled = False  # Global flag
 
@@ -408,6 +634,4 @@ def access_secret_version(project_id, secret_id):
         raise
 
 if __name__ == '__main__':
-    # app.run(host='0.0.0.0', port=9004, debug=True)
-    port = int(os.environ.get('PORT', 9004))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=8080)

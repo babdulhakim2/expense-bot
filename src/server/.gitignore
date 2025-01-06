@@ -70,3 +70,4 @@ coverage.xml
 env_variables.yaml
 env_secrets.yaml
 .env
+.env.yaml

@@ -1,0 +1,27 @@
+# syntax=docker/dockerfile:1.4
+FROM vllm/vllm-openai:latest
+
+WORKDIR /app
+
+ENV HF_HOME=/model-cache
+
+# Echo HF_TOKEN for debugging
+RUN --mount=type=secret,id=HF_TOKEN \
+    echo "HF_TOKEN: $(cat /run/secrets/HF_TOKEN)"
+
+
+# First login to Hugging Face
+RUN --mount=type=secret,id=HF_TOKEN \
+    huggingface-cli login --token $(cat /run/secrets/HF_TOKEN) && \
+    huggingface-cli download superfunguy/palligemma-receipts-Gemma2-challenge
+
+ENV HF_HUB_OFFLINE=1
+
+ENV PORT=8080
+
+EXPOSE ${PORT}
+
+ENTRYPOINT python3 -m vllm.entrypoints.openai.api_server \
+    --port ${PORT} \
+    --model google/gemma-2-2b-it \
+    ${MAX_MODEL_LEN:+--max-model-len "$MAX_MODEL_LEN"}

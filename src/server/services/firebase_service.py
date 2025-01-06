@@ -12,6 +12,8 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import re
 from .google_drive_service import GoogleDriveService
+import mimetypes
+import ssl
 
 # Google Sheets and Drive setup
 scope = [
@@ -84,7 +86,7 @@ class FirebaseService:
             raise
 
     def get_user_by_phone(self, phone_number: str) -> Optional[Dict[str, Any]]:
-        """Get user by phone number from Firebase Auth and then Firestore
+        """Get user by phone number from Firestore
         
         Args:
             phone_number: Phone number in E.164 format (e.g. +1234567890)
@@ -93,25 +95,22 @@ class FirebaseService:
             User data dictionary or None if not found
         """
         try:
-            # First get user from Firebase Auth by phone
-            auth_user = self.auth.get_user_by_phone_number(phone_number)
-            if not auth_user:
-                logger.info(f"No auth user found for phone: {phone_number}")
-                return None
-                
-            # Get the Firebase Auth UID
-            uid = auth_user.uid
-            # Now get user data from Firestore using the auth UID
-            user_ref = self.db.collection('users').document(uid)
-            user = user_ref.get()
-
-            if user.exists:
+            # Query users collection for phone number
+            users = self.db.collection('users')\
+                .where('phoneNumber', '==', phone_number)\
+                .limit(1)\
+                .stream()
+            
+            # Get the first user document from the stream
+            user_docs = list(users)
+            if user_docs:
+                user_doc = user_docs[0]  # Get first document
                 return {
-                    'id': user.id,  # This will be the auth UID
-                    **user.to_dict()
+                    'id': user_doc.id,
+                    **user_doc.to_dict()
                 }
                 
-            logger.info(f"No Firestore user found for uid: {uid}")
+            logger.info(f"No user found for phone_number: {phone_number}")
             return None
             
         except Exception as e:
@@ -119,35 +118,37 @@ class FirebaseService:
             return None
 
     def get_active_business(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get first business for user or create default"""
+        """Get first business where user is owner or create default"""
         try:
-            # Query for first business
-            businesses = self.db.collection('users').document(user_id)\
-                .collection('businesses')\
+            # Query businesses where user is owner
+            businesses = self.db.collection('businesses')\
+                .where('ownerId', '==', user_id)\
                 .limit(1)\
                 .stream()
 
             # Get first business
-            for business in businesses:
+            business_docs = list(businesses)
+            if business_docs:
+                business_doc = business_docs[0]
                 return {
-                    'id': business.id,
-                    **business.to_dict()
+                    'id': business_doc.id,
+                    **business_doc.to_dict()
                 }
 
             # No business found, create default
-            business_ref = self.db.collection('users').document(user_id)\
-                .collection('businesses').document()
-
+            business_ref = self.db.collection('businesses').document()
+            
             business_data = {
                 'id': business_ref.id,
                 'name': 'Default Business',
                 'createdAt': firestore.SERVER_TIMESTAMP,
                 'updatedAt': firestore.SERVER_TIMESTAMP,
-                'type': 'small_business'
+                'type': 'small_business',
+                'ownerId': user_id
             }
             
             business_ref.set(business_data)
-            logger.info(f"Created default business for user {user_id}: {business_ref.id}")
+            logger.info(f"Created default business with owner {user_id}: {business_ref.id}")
             
             return {
                 'id': business_ref.id,
@@ -158,7 +159,7 @@ class FirebaseService:
             logger.error(f"Error getting/creating business: {str(e)}")
             return None
 
-    def record_ai_action(self, user_id: str, business_id: str, 
+    def record_ai_action(self, business_id: str, 
                         action_type: str, action_data: Dict[str, Any],
                         related_id: str = None) -> str:
         """Record an AI/System action with improved tracking
@@ -174,8 +175,7 @@ class FirebaseService:
         - media_processed: Media file processed
         """
         try:
-            action_ref = self.db.collection('users').document(user_id)\
-                .collection('businesses').document(business_id)\
+            action_ref = self.db.collection('businesses').document(business_id)\
                 .collection('actions').document()
 
             timestamp = datetime.now()
@@ -187,8 +187,7 @@ class FirebaseService:
                 'created_at': firestore.SERVER_TIMESTAMP,
                 'timestamp': timestamp.isoformat(),
                 'business_id': business_id,
-                'user_id': user_id,
-                'related_id': related_id,  # ID of related resource (folder_id, spreadsheet_id, etc.)
+                'related_id': related_id
             }
 
             # Add action-specific data
@@ -230,12 +229,11 @@ class FirebaseService:
             logger.error(f"Error recording action: {str(e)}")
             raise
 
-    def store_business_folder(self, user_id: str, business_id: str, 
+    def store_business_folder(self, business_id: str, 
                             folder_data: Dict[str, Any], action_id: str = None) -> str:
         """Store folder metadata under business"""
         try:
-            folder_ref = self.db.collection('users').document(user_id)\
-                .collection('businesses').document(business_id)\
+            folder_ref = self.db.collection('businesses').document(business_id)\
                 .collection('folders').document()
 
             folder_data.update({
@@ -244,7 +242,7 @@ class FirebaseService:
                 'updatedAt': firestore.SERVER_TIMESTAMP,
                 'status': 'active',
                 'business_id': business_id,
-                'action_id': action_id  # Link to the action that created it
+                'action_id': action_id
             })
 
             folder_ref.set(folder_data)
@@ -255,12 +253,11 @@ class FirebaseService:
             logger.error(f"Error storing folder: {str(e)}")
             raise
 
-    def store_business_spreadsheet(self, user_id: str, business_id: str, 
+    def store_business_spreadsheet(self, business_id: str, 
                                  spreadsheet_data: Dict[str, Any], action_id: str = None) -> str:
         """Store spreadsheet metadata under business"""
         try:
-            spreadsheet_ref = self.db.collection('users').document(user_id)\
-                .collection('businesses').document(business_id)\
+            spreadsheet_ref = self.db.collection('businesses').document(business_id)\
                 .collection('spreadsheets').document()
 
             spreadsheet_data.update({
@@ -269,7 +266,7 @@ class FirebaseService:
                 'updatedAt': firestore.SERVER_TIMESTAMP,
                 'status': 'active',
                 'business_id': business_id,
-                'action_id': action_id  # Link to the action that created it
+                'action_id': action_id
             })
 
             spreadsheet_ref.set(spreadsheet_data)
@@ -280,13 +277,12 @@ class FirebaseService:
             logger.error(f"Error storing spreadsheet: {str(e)}")
             raise
 
-    def record_spreadsheet_update(self, user_id: str, business_id: str, 
+    def record_spreadsheet_update(self, business_id: str, 
                                 spreadsheet_id: str, update_data: Dict[str, Any],
                                 action_id: str = None) -> str:
         """Record a spreadsheet update action"""
         try:
-            update_ref = self.db.collection('users').document(user_id)\
-                .collection('businesses').document(business_id)\
+            update_ref = self.db.collection('businesses').document(business_id)\
                 .collection('spreadsheets').document(spreadsheet_id)\
                 .collection('updates').document()
 
@@ -295,7 +291,7 @@ class FirebaseService:
                 'createdAt': firestore.SERVER_TIMESTAMP,
                 'business_id': business_id,
                 'spreadsheet_id': spreadsheet_id,
-                'action_id': action_id  # Link to the action that triggered the update
+                'action_id': action_id
             })
 
             update_ref.set(update_data)
@@ -306,11 +302,10 @@ class FirebaseService:
             logger.error(f"Error recording spreadsheet update: {str(e)}")
             raise 
 
-    def store_folder_metadata(self, user_id: str, business_id: str, folder_data: Dict[str, Any]) -> str:
+    def store_folder_metadata(self, business_id: str, folder_data: Dict[str, Any]) -> str:
         """Store folder metadata in Firestore"""
         try:
-            folder_ref = self.db.collection('users').document(user_id)\
-                .collection('businesses').document(business_id)\
+            folder_ref = self.db.collection('businesses').document(business_id)\
                 .collection('folders').document()
 
             folder_data.update({
@@ -329,97 +324,116 @@ class FirebaseService:
             logger.error(f"Error storing folder metadata: {str(e)}")
             raise
 
-    def get_or_create_business_folder(self, user_id: str, business_id: str) -> Dict[str, Any]:
+    def get_or_create_business_folder(self, business_id: str) -> Dict[str, Any]:
         """Get or create the root business folder in Drive and Firestore"""
-        try:
-            # First check Firestore for existing folder
-            folders = self.db.collection('users').document(user_id)\
-                .collection('businesses').document(business_id)\
-                .collection('folders')\
-                .where('type', '==', 'business_root')\
-                .limit(1)\
-                .stream()
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                # First check Firestore for existing folder
+                folders = self.db.collection('businesses').document(business_id)\
+                    .collection('folders')\
+                    .where('type', '==', 'business_root')\
+                    .limit(1)\
+                    .stream()
 
-            folder_docs = list(folders)
-            if folder_docs:
-                folder_data = folder_docs[0].to_dict()
-                # Verify folder still exists in Drive
+                folder_docs = list(folders)
+                if folder_docs:
+                    folder_data = folder_docs[0].to_dict()
+                    folder_id = folder_docs[0].id
+                    
+                    # Verify folder still exists in Drive
+                    try:
+                        drive_folder = self.drive_service.get_file(folder_data['drive_folder_id'])
+                        return {
+                            'id': folder_id,
+                            'drive_id': folder_data['drive_folder_id'],
+                            'name': drive_folder['name'],
+                            'url': drive_folder['webViewLink'],
+                            'type': 'business_root'
+                        }
+                    except Exception as e:
+                        logger.warning(f"Drive folder not found, will recreate: {str(e)}")
+                        # Don't raise here - continue to create new folder
+                
+                # Get business details for folder name
+                business = self.db.collection('businesses').document(business_id).get()
+                if not business.exists:
+                    raise ValueError(f"Business {business_id} not found")
+                
+                business_data = business.to_dict()
+                business_name = business_data.get('name', f'Business-{business_id}')
+                owner_email = business_data.get('ownerEmail')
+                
+                if not owner_email:
+                    raise ValueError(f"Owner email not found for business {business_id}")
+
+                # Create new business folder in Drive with retry
                 try:
-                    folder = self.drive_service.get_file(folder_data['drive_folder_id'])
-                    return {
-                        'id': folder_data['folder_id'],
-                        'drive_id': folder_data['drive_folder_id'],
-                        'name': folder['name'],
-                        'url': folder['webViewLink'],
-                        'type': 'business_root'
-                    }
-                except Exception as e:
-                    logger.warning(f"Drive folder not found, will recreate: {str(e)}")
+                    drive_folder = self.drive_service.create_folder(
+                        folder_name=business_name
+                    )
+                except ssl.SSLError as e:
+                    retry_count += 1
+                    logger.warning(f"SSL Error creating folder (attempt {retry_count}/{max_retries}): {str(e)}")
+                    if retry_count == max_retries:
+                        raise
+                    continue
+                
+                # Record folder creation action
+                action_id = self.record_ai_action(
+                    business_id=business_id,
+                    action_type='folder_created',
+                    action_data={
+                        'type': 'business_root',
+                        'name': drive_folder['name'],
+                        'drive_folder_id': drive_folder['id'],
+                        'url': drive_folder['url']
+                    },
+                    related_id=drive_folder['id']
+                )
 
-            # Create new business folder in Drive
-            drive_folder = self.drive_service.create_folder(
-                folder_name=f"Business-{business_id}"
-            )
-            
-            # Record folder creation action
-            self.record_ai_action(
-                user_id=user_id,
-                business_id=business_id,
-                action_type='folder_created',
-                action_data={
-                    'type': 'business_root',
+                # Set permissions
+                service_account = json.loads(Config.SERVICE_ACCOUNT_KEY)
+                service_account_email = service_account['client_email']
+                
+                self.drive_service.set_permissions(
+                    drive_folder['id'],
+                    owner_email,
+                    service_account_email
+                )
+                
+                # Store in Firestore
+                folder_data = {
                     'name': drive_folder['name'],
                     'drive_folder_id': drive_folder['id'],
-                    'url': drive_folder['url']
-                },
-                related_id=drive_folder['id']
-            )
-            
-            # Get user email for permissions
-            user = self.db.collection('users').document(user_id).get()
-            if not user.exists:
-                raise ValueError(f"User {user_id} not found")
-            
-            user_email = user.to_dict().get('email')
-            service_account = json.loads(Config.SERVICE_ACCOUNT_KEY)
-            service_account_email = service_account['client_email']
-            
-            # Set permissions
-            self.drive_service.set_permissions(
-                drive_folder['id'],
-                user_email,
-                service_account_email
-            )
-            
-            # Store in Firestore
-            folder_data = {
-                'name': drive_folder['name'],
-                'drive_folder_id': drive_folder['id'],
-                'url': drive_folder['url'],
-                'type': 'business_root'
-            }
-            
-            folder_id = self.store_folder_metadata(user_id, business_id, folder_data)
-            
-            return {
-                'id': folder_id,
-                'drive_id': drive_folder['id'],
-                'name': drive_folder['name'],
-                'url': drive_folder['url'],
-                'type': 'business_root'
-            }
+                    'url': drive_folder['url'],
+                    'type': 'business_root',
+                    'business_id': business_id,
+                    'action_id': action_id
+                }
                 
-        except Exception as e:
-            logger.error(f"Error in get_or_create_business_folder: {str(e)}")
-            raise
+                folder_id = self.store_folder_metadata(business_id, folder_data)
+                
+                return {
+                    'id': folder_id,
+                    'drive_id': drive_folder['id'],
+                    'name': drive_folder['name'],
+                    'url': drive_folder['url'],
+                    'type': 'business_root'
+                }
+                
+            except Exception as e:
+                logger.error(f"Error in get_or_create_business_folder: {str(e)}")
+                raise
 
-    def get_or_create_transactions_folder(self, user_id: str, business_id: str, 
+    def get_or_create_transactions_folder(self, business_id: str, 
                                         business_folder_id: str) -> Dict[str, Any]:
         """Get or create Transactions folder within business folder"""
         try:
             # First check Firestore for existing folder
-            folders = self.db.collection('users').document(user_id)\
-                .collection('businesses').document(business_id)\
+            folders = self.db.collection('businesses').document(business_id)\
                 .collection('folders')\
                 .where('type', '==', 'transactions')\
                 .where('parent_folder_id', '==', business_folder_id)\
@@ -450,7 +464,6 @@ class FirebaseService:
             
             # Record transactions folder creation action
             self.record_ai_action(
-                user_id=user_id,
                 business_id=business_id,
                 action_type='folder_created',
                 action_data={
@@ -462,13 +475,8 @@ class FirebaseService:
                 },
                 related_id=drive_folder['id']
             )
-            
-            # Get user email for permissions
-            user = self.db.collection('users').document(user_id).get()
-            if not user.exists:
-                raise ValueError(f"User {user_id} not found")
-            
-            user_email = user.to_dict().get('email')
+   
+            user_email = self.get_owner_email(business_id)
             service_account = json.loads(Config.SERVICE_ACCOUNT_KEY)
             service_account_email = service_account['client_email']
             
@@ -488,7 +496,7 @@ class FirebaseService:
                 'parent_folder_id': business_folder_id
             }
             
-            folder_id = self.store_folder_metadata(user_id, business_id, folder_data)
+            folder_id = self.store_folder_metadata( business_id, folder_data)
             
             return {
                 'id': folder_id,
@@ -502,18 +510,28 @@ class FirebaseService:
             logger.error(f"Error in get_or_create_transactions_folder: {str(e)}")
             raise
 
-    def get_or_create_year_folder(self, user_id: str, business_id: str, 
+    def get_owner_email(self, business_id: str) -> Optional[str]:
+        """Get the owner email for a business"""
+        try:
+            business = self.db.collection('businesses').document(business_id).get()
+            if business.exists:
+                return business.to_dict().get('ownerEmail')
+            return None
+        except Exception as e:
+            logger.error(f"Error getting owner email: {str(e)}")
+            return None
+
+
+    def get_or_create_year_folder(self, business_id: str,  transaction_year: str,
                                  transactions_folder_id: str) -> Dict[str, Any]:
         """Get or create year folder within Transactions folder"""
         try:
-            year = datetime.now().strftime('%Y')
             
             # First check Firestore for existing folder
-            folders = self.db.collection('users').document(user_id)\
-                .collection('businesses').document(business_id)\
+            folders = self.db.collection('businesses').document(business_id)\
                 .collection('folders')\
                 .where('type', '==', 'year')\
-                .where('year', '==', year)\
+                .where('year', '==', transaction_year)\
                 .where('parent_folder_id', '==', transactions_folder_id)\
                 .limit(1)\
                 .stream()
@@ -530,20 +548,19 @@ class FirebaseService:
                         'name': folder['name'],
                         'url': folder['webViewLink'],
                         'type': 'year',
-                        'year': year
+                        'year': transaction_year
                     }
                 except Exception as e:
                     logger.warning(f"Drive folder not found, will recreate: {str(e)}")
 
             # Create year folder
             drive_folder = self.drive_service.create_folder(
-                folder_name=year,
+                folder_name=transaction_year,
                 parent_id=transactions_folder_id
             )
             
             # Record year folder creation action
             self.record_ai_action(
-                user_id=user_id,
                 business_id=business_id,
                 action_type='folder_created',
                 action_data={
@@ -552,17 +569,14 @@ class FirebaseService:
                     'drive_folder_id': drive_folder['id'],
                     'url': drive_folder['url'],
                     'parent_folder_id': transactions_folder_id,
-                    'year': year
+                    'year': transaction_year
                 },
                 related_id=drive_folder['id']
             )
             
-            # Get user email for permissions
-            user = self.db.collection('users').document(user_id).get()
-            if not user.exists:
-                raise ValueError(f"User {user_id} not found")
+           
             
-            user_email = user.to_dict().get('email')
+            user_email = self.get_owner_email(business_id)
             service_account = json.loads(Config.SERVICE_ACCOUNT_KEY)
             service_account_email = service_account['client_email']
             
@@ -579,11 +593,11 @@ class FirebaseService:
                 'drive_folder_id': drive_folder['id'],
                 'url': drive_folder['url'],
                 'type': 'year',
-                'year': year,
+                'year': transaction_year,
                 'parent_folder_id': transactions_folder_id
             }
             
-            folder_id = self.store_folder_metadata(user_id, business_id, folder_data)
+            folder_id = self.store_folder_metadata( business_id, folder_data)
             
             return {
                 'id': folder_id,
@@ -591,14 +605,14 @@ class FirebaseService:
                 'name': drive_folder['name'],
                 'url': drive_folder['url'],
                 'type': 'year',
-                'year': year
+                'year': transaction_year
             }
                 
         except Exception as e:
             logger.error(f"Error in get_or_create_year_folder: {str(e)}")
             raise
 
-    def get_or_create_monthly_spreadsheet(self, user_id: str, business_id: str, 
+    def get_or_create_monthly_spreadsheet(self, business_id: str, 
                                         year_folder_id: str, date: datetime) -> Dict[str, Any]:
         """Get or create monthly expense spreadsheet in the year folder."""
         try:
@@ -608,8 +622,7 @@ class FirebaseService:
             sheet_name = f"{month_name} {year}"
             
             # First check Firestore for existing spreadsheet
-            spreadsheets = self.db.collection('users').document(user_id)\
-                .collection('businesses').document(business_id)\
+            spreadsheets = self.db.collection('businesses').document(business_id)\
                 .collection('spreadsheets')\
                 .where('month', '==', month_name)\
                 .where('year', '==', year)\
@@ -643,7 +656,6 @@ class FirebaseService:
             
             # Record spreadsheet creation
             self.record_ai_action(
-                user_id=user_id,
                 business_id=business_id,
                 action_type='spreadsheet_created',
                 action_data={
@@ -657,11 +669,8 @@ class FirebaseService:
             )
             
             # Get user email for permissions
-            user = self.db.collection('users').document(user_id).get()
-            if not user.exists:
-                raise ValueError(f"User {user_id} not found")
             
-            user_email = user.to_dict().get('email')
+            user_email = self.get_owner_email(business_id)
             service_account = json.loads(Config.SERVICE_ACCOUNT_KEY)
             service_account_email = service_account['client_email']
             
@@ -673,8 +682,7 @@ class FirebaseService:
             )
             
             # Create Firestore document
-            spreadsheet_ref = self.db.collection('users').document(user_id)\
-                .collection('businesses').document(business_id)\
+            spreadsheet_ref = self.db.collection('businesses').document(business_id)\
                 .collection('spreadsheets').document()
             
             spreadsheet_data = {
@@ -700,11 +708,10 @@ class FirebaseService:
             raise
 
     
-    def record_expense(self, user_id: str, business_id: str, expense_data: Dict[str, Any]) -> Dict[str, Any]:
+    def record_expense(self, business_id: str, expense_data: Dict[str, Any]) -> Dict[str, Any]:
         """Record an expense transaction"""
         try:
-            expense_ref = self.db.collection('users').document(user_id)\
-                .collection('businesses').document(business_id)\
+            expense_ref = self.db.collection('businesses').document(business_id)\
                 .collection('transactions').document()
                 
             expense_data.update({
@@ -717,7 +724,6 @@ class FirebaseService:
                 
             # Record transaction action
             action_id = self.record_ai_action(
-                user_id=user_id,
                 business_id=business_id,
                 action_type='transaction_recorded',
                 action_data={
@@ -744,13 +750,12 @@ class FirebaseService:
             raise
 
     
-    def update_expense_spreadsheet(self, user_id: str, business_id: str, 
+    def update_expense_spreadsheet(self, business_id: str, 
                                  spreadsheet_id: str, expense_data: Dict[str, Any]) -> Dict[str, Any]:
         """Update expense spreadsheet with new transaction."""
         try:
             # Get spreadsheet data from Firestore
-            spreadsheet = self.db.collection('users').document(user_id)\
-                .collection('businesses').document(business_id)\
+            spreadsheet = self.db.collection('businesses').document(business_id)\
                 .collection('spreadsheets').document(spreadsheet_id).get()
             
             if not spreadsheet.exists:
@@ -855,8 +860,7 @@ class FirebaseService:
                     ).execute()
 
             # Record update in Firestore
-            update_ref = self.db.collection('users').document(user_id)\
-                .collection('businesses').document(business_id)\
+            update_ref = self.db.collection('businesses').document(business_id)\
                 .collection('spreadsheets').document(spreadsheet_id)\
                 .collection('updates').document()
 
@@ -884,12 +888,11 @@ class FirebaseService:
             logger.error(f"Error updating expense spreadsheet: {str(e)}")
             raise
 
-    def store_message(self, user_id: str, business_id: str, message_data: Dict[str, Any]) -> Dict[str, Any]:
+    def store_message(self, business_id: str, message_data: Dict[str, Any]) -> Dict[str, Any]:
         """Store a WhatsApp message interaction"""
         try:
             # Create message reference under the business
-            message_ref = self.db.collection('users').document(user_id)\
-                .collection('businesses').document(business_id)\
+            message_ref = self.db.collection('businesses').document(business_id)\
                 .collection('messages').document()
             
             message_data.update({
@@ -964,7 +967,7 @@ class FirebaseService:
 
     
 
-    def check_duplicate_transaction(self, user_id: str, business_id: str, 
+    def check_duplicate_transaction(self, business_id: str, 
                                   transaction_data: Dict[str, Any]) -> bool:
         """
         Check if a similar transaction already exists based on date, amount, and description.
@@ -972,8 +975,7 @@ class FirebaseService:
         """
         try:
             # Get transactions from the same date with same amount
-            transactions = self.db.collection('users').document(user_id)\
-                .collection('businesses').document(business_id)\
+            transactions = self.db.collection('businesses').document(business_id)\
                 .collection('transactions')\
                 .where('date', '==', transaction_data['date'])\
                 .where('amount', '==', float(transaction_data['amount']))\
@@ -992,8 +994,7 @@ class FirebaseService:
 
             # Also check in spreadsheet for the current month
             if 'spreadsheet_id' in transaction_data:
-                spreadsheet = self.db.collection('users').document(user_id)\
-                    .collection('businesses').document(business_id)\
+                spreadsheet = self.db.collection('businesses').document(business_id)\
                     .collection('spreadsheets').document(transaction_data['spreadsheet_id']).get()
                 
                 if spreadsheet.exists:
@@ -1043,3 +1044,262 @@ class FirebaseService:
         
         # If more than 70% words match, consider it similar
         return overlap / total > 0.7 if total > 0 else False
+
+    def get_or_create_documents_folder(self, business_id: str, 
+                                     document_type: str,
+                                     business_folder_id: str) -> Dict[str, Any]:
+        """Get or create documents (receipts/invoices) folder"""
+        try:
+            # Check for existing folder
+            folders = self.db.collection('businesses').document(business_id)\
+                .collection('folders')\
+                .where('type', '==', f'{document_type}_root')\
+                .limit(1)\
+                .stream()
+            
+            folder_docs = list(folders)
+            if folder_docs:
+                folder_data = folder_docs[0].to_dict()
+                folder_id = folder_docs[0].id
+                
+                # Verify folder still exists in Drive
+                try:
+                    drive_folder = self.drive_service.get_file(folder_data['drive_folder_id'])
+                    return {
+                        'id': folder_id,
+                        'drive_id': folder_data['drive_folder_id'],
+                        'name': drive_folder['name'],
+                        'url': drive_folder['webViewLink'],
+                        'type': f'{document_type}_root'
+                    }
+                except Exception as e:
+                    logger.warning(f"Drive folder not found, will recreate: {str(e)}")
+
+            # Create new folder
+            folder_name = f"{document_type.title()}s"  # "Receipts" or "Invoices"
+            drive_folder = self.drive_service.create_folder(
+                folder_name=folder_name,
+                parent_id=business_folder_id
+            )
+            
+            # Record folder creation
+            action_id = self.record_ai_action(
+                business_id=business_id,
+                action_type='folder_created',
+                action_data={
+                    'type': f'{document_type}_root',
+                    'name': drive_folder['name'],
+                    'drive_folder_id': drive_folder['id']
+                }
+            )
+            
+            # Store metadata
+            folder_data = {
+                'name': drive_folder['name'],
+                'drive_folder_id': drive_folder['id'],
+                'url': drive_folder['url'],
+                'type': f'{document_type}_root',
+                'business_id': business_id,
+                'action_id': action_id
+            }
+            
+            folder_id = self.store_folder_metadata(business_id, folder_data)
+            
+            return {
+                'id': folder_id,
+                'drive_id': drive_folder['id'],
+                'name': drive_folder['name'],
+                'url': drive_folder['url'],
+                'type': f'{document_type}_root'
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in get_or_create_documents_folder: {str(e)}")
+            raise
+
+    def get_or_create_document_year_folder(self, business_id: str, 
+                                         document_type: str,
+                                         year: str,
+                                         parent_folder_id: str) -> Dict[str, Any]:
+        """Get or create year folder for documents"""
+        try:
+            # Check for existing folder
+            folders = self.db.collection('businesses').document(business_id)\
+                .collection('folders')\
+                .where('type', '==', f'{document_type}_year')\
+                .where('year', '==', year)\
+                .limit(1)\
+                .stream()
+            
+            folder_docs = list(folders)
+            if folder_docs:
+                folder_data = folder_docs[0].to_dict()
+                folder_id = folder_docs[0].id
+                
+                # Verify folder still exists in Drive
+                try:
+                    drive_folder = self.drive_service.get_file(folder_data['drive_folder_id'])
+                    return {
+                        'id': folder_id,
+                        'drive_id': folder_data['drive_folder_id'],
+                        'name': drive_folder['name'],
+                        'url': drive_folder['webViewLink'],
+                        'type': f'{document_type}_year'
+                    }
+                except Exception as e:
+                    logger.warning(f"Drive folder not found, will recreate: {str(e)}")
+
+            # Create new folder
+            folder_name = str(year)
+            drive_folder = self.drive_service.create_folder(
+                folder_name=folder_name,
+                parent_id=parent_folder_id
+            )
+            
+            # Store metadata
+            folder_data = {
+                'name': drive_folder['name'],
+                'drive_folder_id': drive_folder['id'],
+                'url': drive_folder['url'],
+                'type': f'{document_type}_year',
+                'year': year,
+                'business_id': business_id
+            }
+            
+            folder_id = self.store_folder_metadata(business_id, folder_data)
+            
+            return {
+                'id': folder_id,
+                'drive_id': drive_folder['id'],
+                'name': drive_folder['name'],
+                'url': drive_folder['url'],
+                'type': f'{document_type}_year'
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in get_or_create_document_year_folder: {str(e)}")
+            raise
+
+    def get_or_create_document_month_folder(self, business_id: str,
+                                          document_type: str,
+                                          year: str,
+                                          month: str,
+                                          year_folder_id: str) -> Dict[str, Any]:
+        """Get or create month folder for documents"""
+        try:
+            # Check for existing folder
+            folders = self.db.collection('businesses').document(business_id)\
+                .collection('folders')\
+                .where('type', '==', f'{document_type}_month')\
+                .where('year', '==', year)\
+                .where('month', '==', month)\
+                .limit(1)\
+                .stream()
+            
+            folder_docs = list(folders)
+            if folder_docs:
+                folder_data = folder_docs[0].to_dict()
+                folder_id = folder_docs[0].id
+                
+                # Verify folder still exists in Drive
+                try:
+                    drive_folder = self.drive_service.get_file(folder_data['drive_folder_id'])
+                    return {
+                        'id': folder_id,
+                        'drive_id': folder_data['drive_folder_id'],
+                        'name': drive_folder['name'],
+                        'url': drive_folder['webViewLink'],
+                        'type': f'{document_type}_month'
+                    }
+                except Exception as e:
+                    logger.warning(f"Drive folder not found, will recreate: {str(e)}")
+
+            # Create new folder
+            month_names = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December']
+            month_num = int(month)
+            folder_name = month_names[month_num - 1]
+            
+            drive_folder = self.drive_service.create_folder(
+                folder_name=folder_name,
+                parent_id=year_folder_id
+            )
+            
+            # Store metadata
+            folder_data = {
+                'name': drive_folder['name'],
+                'drive_folder_id': drive_folder['id'],
+                'url': drive_folder['url'],
+                'type': f'{document_type}_month',
+                'year': year,
+                'month': month,
+                'business_id': business_id
+            }
+            
+            folder_id = self.store_folder_metadata(business_id, folder_data)
+            
+            return {
+                'id': folder_id,
+                'drive_id': drive_folder['id'],
+                'name': drive_folder['name'],
+                'url': drive_folder['url'],
+                'type': f'{document_type}_month'
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in get_or_create_document_month_folder: {str(e)}")
+            raise
+
+    def store_document(self, business_id: str,
+                      document_type: str,
+                      file_content: bytes,
+                      mime_type: str,
+                      date: str,
+                      metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Store document in appropriate folder structure"""
+        try:
+            year = date[:4]
+            month = date[5:7]
+            business_folder_id = metadata.get('business_folder_id')
+            
+            if not business_folder_id:
+                raise ValueError("business_folder_id is required in metadata")
+            
+            # Get or create folder structure
+            documents_folder = self.get_or_create_documents_folder(
+                business_id=business_id,
+                document_type=document_type,
+                business_folder_id=business_folder_id
+            )
+            
+            year_folder = self.get_or_create_document_year_folder(
+                business_id=business_id,
+                document_type=document_type,
+                year=year,
+                parent_folder_id=documents_folder['drive_id']
+            )
+            
+            month_folder = self.get_or_create_document_month_folder(
+                business_id=business_id,
+                document_type=document_type,
+                year=year,
+                month=month,
+                year_folder_id=year_folder['drive_id']
+            )
+            
+            # Upload file
+            file_name = f"{date}_{metadata.get('merchant', 'unknown')}_{document_type}"
+            file_extension = mimetypes.guess_extension(mime_type) or '.pdf'
+            
+            drive_file = self.drive_service.upload_file(
+                file_content=file_content,
+                file_name=f"{file_name}{file_extension}",
+                mime_type=mime_type,
+                parent_folder_id=month_folder['drive_id']
+            )
+            
+            return drive_file
+            
+        except Exception as e:
+            logger.error(f"Error storing document: {str(e)}")
+            raise
