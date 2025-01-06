@@ -2,17 +2,46 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if request.auth != null && request.auth.uid == userId
-        && request.resource.data.keys().hasAll(['id', 'email', 'name'])
-        && request.resource.data.id == userId;
-        
-      // Add rules for businesses subcollection
-      match /businesses/{businessId} {
-        allow read: if request.auth != null && request.auth.uid == userId;
-        allow write: if request.auth != null && request.auth.uid == userId;
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isBusinessMember(businessId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId;
+    }
+
+    // Businesses collection
+    match /businesses/{businessId} {
+      // Allow read if user is authenticated and is a member of the business
+      allow read: if isBusinessMember(businessId);
+      
+      // Allow create if user is authenticated
+      allow create: if isAuthenticated();
+      
+      // Allow update if user is authenticated and is the owner
+      allow update: if isAuthenticated() && 
+        resource.data.ownerId == request.auth.uid;
+
+      // Allow access to all subcollections for business members
+      match /{subcollection}/{document=**} {
+        allow read: if isBusinessMember(businessId);
       }
+
+      // Explicitly allow access to actions subcollection
+      match /actions/{actionId} {
+        allow read: if isBusinessMember(businessId);
+      }
+    }
+
+    // Users collection
+    match /users/{userId} {
+      // Allow users to read/write their own data
+      allow read, write: if isAuthenticated() && userId == request.auth.uid;
+      
+      // Allow querying users
+      allow list: if isAuthenticated();
     }
   }
 }

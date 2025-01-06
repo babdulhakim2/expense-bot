@@ -1,11 +1,108 @@
 'use client';
 
 import { UserIcon, PhoneIcon, AtSignIcon, ShieldIcon } from "lucide-react";
+import { useState, useEffect } from 'react';
+import { useSession } from "next-auth/react";
+import { UserService, type User } from '@/lib/firebase/services/user-service';
+import { useToast } from "@/hooks/use-toast";
+import { PhoneNumberInput } from "@/components/shared/phone-input";
+
+type ExtendedSession = {
+  user?: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+    phoneNumber?: string | null;
+  } | null;
+}
 
 export function ProfileSettings() {
+  const { data: session } = useSession() as { data: ExtendedSession };
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [userData, setUserData] = useState<Partial<User>>({
+    name: '',
+    email: '',
+    phoneNumber: '',
+    role: '',
+  });
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      if (session?.user?.id) {
+        try {
+          const user = await UserService.getUser(session.user.id);
+          if (user) {
+            setUserData({
+              name: user.name || session?.user?.name || '',
+              email: user.email || session?.user?.email || '',
+              phoneNumber: user.phoneNumber || '',
+              role: user.role || '',
+            });
+          } else if (session?.user) {
+            // If no user document exists yet, use session data
+            setUserData({
+              name: session.user.name || '',
+              email: session.user.email || '',
+            });
+          }
+        } catch (error) {
+          console.error('Failed to fetch user:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load user data",
+            variant: "destructive",
+          });
+        }
+      }
+    };
+
+    fetchUser();
+  }, [session]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!session?.user?.id) return;
+
+    setLoading(true);
+    try {
+      await UserService.createOrUpdateUser({
+        id: session.user.id,
+        ...userData,
+      });
+
+      toast({
+        title: "Success",
+        description: "Profile updated successfully",
+      });
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update profile",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setUserData(prev => ({
+      ...prev,
+      [e.target.name]: e.target.value
+    }));
+  };
+
+  const handlePhoneChange = (value: string) => {
+    setUserData(prev => ({
+      ...prev,
+      phoneNumber: value
+    }));
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Personal Information */}
+    <form onSubmit={handleSubmit} className="space-y-6">
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
         <div className="p-6">
           <h2 className="text-lg font-semibold mb-4">Personal Information</h2>
@@ -14,6 +111,9 @@ export function ProfileSettings() {
               <label className="block text-sm font-medium mb-1">Full Name</label>
               <input 
                 type="text"
+                name="name"
+                value={userData.name || ''}
+                onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 placeholder="Enter your name"
               />
@@ -22,86 +122,49 @@ export function ProfileSettings() {
               <label className="block text-sm font-medium mb-1">Email Address</label>
               <input 
                 type="email"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                name="email"
+                value={userData.email || ''}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
                 placeholder="Enter your email"
               />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Phone Number</label>
-              <input 
-                type="tel"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="Enter your WhatsApp number"
+              <PhoneNumberInput
+                value={userData.phoneNumber || ''}
+                onChange={handlePhoneChange}
+                className="w-full"
               />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Role</label>
-              <select className="w-full px-3 py-2 border border-gray-300 rounded-md">
-                <option>Business Owner</option>
-                <option>Accountant</option>
-                <option>Manager</option>
-                <option>Employee</option>
+              <select 
+                name="role"
+                value={userData.role || ''}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              >
+                <option value="">Select a role</option>
+                <option value="Business Owner">Business Owner</option>
+                <option value="Accountant">Accountant</option>
+                <option value="Manager">Manager</option>
+                <option value="Employee">Employee</option>
               </select>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Security Settings */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-        <div className="p-6">
-          <h2 className="text-lg font-semibold mb-4">Security</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Current Password</label>
-              <input 
-                type="password"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="Enter current password"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">New Password</label>
-              <input 
-                type="password"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="Enter new password"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Confirm New Password</label>
-              <input 
-                type="password"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="Confirm new password"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Two-Factor Authentication */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-        <div className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">Two-Factor Authentication</h2>
-              <p className="text-sm text-gray-500 mt-1">Add an extra layer of security to your account</p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" className="sr-only peer" />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      {/* Save Button */}
       <div className="flex justify-end">
-        <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-          Save Changes
+        <button 
+          type="submit"
+          disabled={loading}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+        >
+          {loading ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
-    </div>
+    </form>
   );
 } 

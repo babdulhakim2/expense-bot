@@ -14,12 +14,11 @@ import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { BusinessSwitcher } from '../business/business-switcher';
+import { BusinessInfo } from '../business/business-info';
 
 const navigationItems = [
   { name: 'Overview', href: '/dashboard', icon: HomeIcon },
-  { name: 'Folders', href: '/dashboard/folders', icon: FolderIcon },
-  { name: 'Spreadsheets', href: '/dashboard/spreadsheets', icon: FileSpreadsheetIcon },
+  { name: 'Drive', href: '/dashboard/folders', icon: FolderIcon },
   { name: 'Settings', href: '/dashboard/settings', icon: SettingsIcon },
 ];
 
@@ -31,9 +30,9 @@ export function SidebarNav() {
     <div className="flex h-full w-[240px] flex-col bg-gray-900 text-white">
       <div className="p-6 border-b border-gray-800">
         <Link href='/' >
-        <h2 className="text-xl font-bold mb-4">Expense Bot</h2>
+          <h2 className="text-xl font-bold mb-4">Expense Bot</h2>
         </Link>
-        <BusinessSwitcher />
+        <BusinessInfo />
       </div>
       <nav className="flex-1 space-y-1 px-3">
         {navigationItems.map((item) => (

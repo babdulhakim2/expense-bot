@@ -10,6 +10,7 @@ declare module "next-auth" {
       id: string;
       phoneNumber?: string | null;
       idToken?: string;
+      email?: string | null;
     }
   }
   
@@ -54,7 +55,10 @@ const verifyToken = async (token: string): Promise<DecodedIdToken | null> => {
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
-      credentials: {},
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        signInLink: { label: 'Sign In Link', type: 'text' },
+      },
       async authorize(credentials: any): Promise<User | null> {
         if (!credentials?.token) {
           console.error("No token provided");
@@ -72,7 +76,7 @@ export const authOptions: NextAuthOptions = {
           
           return {
             id: decodedToken.user_id,
-            phoneNumber: decodedToken.phone_number || null,
+            email: decodedToken.email || null,
             idToken: credentials.token,
           };
           
@@ -91,7 +95,7 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.phoneNumber = user.phoneNumber || undefined;
+        token.email = user.email || undefined;
         token.idToken = user.idToken;
       }
       return token;
@@ -99,7 +103,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session?.user) {
         session.user.id = token.id as string;
-        session.user.phoneNumber = token.phoneNumber as string | null;
+        session.user.email = token.email as string | null;
         session.user.idToken = token.idToken as string;
       }
       return session;

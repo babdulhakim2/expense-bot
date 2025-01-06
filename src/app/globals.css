@@ -80,3 +80,12 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes orbit {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg) translateY(-100px) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg) translateY(-100px) rotate(-360deg);
+  }
+}

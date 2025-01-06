@@ -1,0 +1,51 @@
+steps:
+  # Step 1: Build the container image
+  - name: "gcr.io/cloud-builders/docker"
+    env:
+      - "DOCKER_BUILDKIT=1"
+    args:
+      - "build"
+      - "-t"
+      - "us-central1-docker.pkg.dev/${_PROJECT_ID}/backend/llm-service:latest"
+      - "-f"
+      - "Dockerfile.llm"
+      - "--build-arg"
+      - "HF_TOKEN=$$HF_TOKEN"
+      - "--secret"
+      - "id=HF_TOKEN"
+      - "."
+    secretEnv: ["HF_TOKEN"]
+
+  # Step 2: Push the container image
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "us-central1-docker.pkg.dev/${_PROJECT_ID}/backend/llm-service:latest"
+
+  # Step 3: Deploy to Cloud Run
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
+    entrypoint: "gcloud"
+    args:
+      - "run"
+      - "deploy"
+      - "llm-service"
+      - "--image=us-central1-docker.pkg.dev/${_PROJECT_ID}/backend/llm-service:latest"
+      - "--platform=managed"
+      - "--region=${_REGION}"
+      - "--memory=4Gi"
+      - "--cpu=2"
+      - "--min-instances=0"
+      - "--max-instances=4"
+      - "--allow-unauthenticated"
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/${_PROJECT_ID}/secrets/HF_TOKEN/versions/latest
+      env: "HF_TOKEN"
+
+substitutions:
+  _REGION: us-central1
+  _PROJECT_ID: expense-bot-441618
+
+images:
+  - "us-central1-docker.pkg.dev/${_PROJECT_ID}/backend/llm-service:latest"

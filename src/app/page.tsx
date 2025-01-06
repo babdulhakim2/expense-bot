@@ -12,10 +12,12 @@ export default function Home() {
   const { data: session } = useSession();
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background to-secondary">
-      <div className="container mx-auto px-4 pt-20 pb-16">
+    <main className="min-h-screen flex flex-col items-center">
+      <div className="w-full max-w-6xl mx-auto px-4 py-12 space-y-20">
         <HeroSection isAuthenticated={!!session} />
-        <AuthForms />
+        <div className="flex justify-center">
+          <AuthForms />
+        </div>
         <FeaturesGrid />
         <PoweredBySection />
         <GithubBanner />

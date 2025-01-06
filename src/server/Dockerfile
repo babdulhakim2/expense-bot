@@ -1,21 +1,38 @@
-FROM vllm/vllm-openai:latest
+# Use Python 3.12 slim image
+FROM python:3.12-slim
 
-ARG HF_TOKEN
-ENV HF_TOKEN=${HF_TOKEN}
+# Set working directory
+WORKDIR /app
 
-ENV HF_HOME=/model-cache
-RUN --mount=type=secret,id=HF_TOKEN,required=true \
-    if [ -z "$(cat /run/secrets/HF_TOKEN)" ]; then \
-        echo "Error: HF_TOKEN secret is empty" && exit 1; \
-    fi && \
-    HF_TOKEN=$(cat /run/secrets/HF_TOKEN) && \
-    echo "Logging into Hugging Face..." && \
-    huggingface-cli login $HF_TOKEN && \
-    echo "Downloading model..." && \
-    huggingface-cli download google/gemma-2-2b-it
+# Add build arg for env file
+ARG ENV_FILE=.env
+ENV ENV_FILE=${ENV_FILE}
 
-ENV HF_HUB_OFFLINE=1
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-ENTRYPOINT ["python3", "-m", "vllm.entrypoints.openai.api_server", \
-    "--port", "${PORT:-8000}", \
-    "--model", "${MODEL_NAME:-google/gemma-2-2b-it}"]
+# Copy requirements and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application
+COPY . .
+
+# Copy the specified env file to .env
+COPY ${ENV_FILE} .env
+
+# Set environment variable for Flask
+ENV FLASK_APP=app.py
+ENV PORT=8080
+
+# Expose port 8080
+EXPOSE 8080
+
+# Create directory for model cache
+RUN mkdir -p /model-cache
+
+# Run the application
+CMD ["python", "app.py"]

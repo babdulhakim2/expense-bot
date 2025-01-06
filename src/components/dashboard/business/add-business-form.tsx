@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useBusiness } from "@/contexts/business-context";
 import { toast } from "@/hooks/use-toast";
 import { BUSINESS_CATEGORIES } from "@/lib/constants/business-categories";
 import { BusinessService } from '@/lib/firebase/services/business-service';
@@ -20,7 +19,6 @@ interface FormData {
 export function AddBusinessForm() {
   const router = useRouter();
   const { data: session } = useSession();
-  const { businesses, setBusinesses, setCurrentBusiness } = useBusiness();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -33,13 +31,15 @@ export function AddBusinessForm() {
     
     setLoading(true);
     try {
-      const businessData = await BusinessService.createBusiness(session.user.id, {
-        name: formData.name,
-        type: formData.type,
-      });
+      const businessData = await BusinessService.createBusiness(
+        session.user.id,
+        session.user.email!,
+        {
+          name: formData.name,
+          type: formData.type,
+        }
+      );
       
-      setCurrentBusiness(businessData);
-      setBusinesses([...businesses, businessData]);
 
       toast({
         title: "Success",
