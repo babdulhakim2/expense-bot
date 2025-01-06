@@ -18,7 +18,7 @@ import React, { FormEvent, useEffect, useState } from 'react';
 import { Icons } from '@/components/shared/icons';
 
 const actionCodeSettings = {
-  url: process.env.NEXT_PUBLIC_AUTH_REDIRECT_URL || 'http://localhost:3000',
+  url: process.env.NEXT_PUBLIC_AUTH_REDIRECT_URL,
   handleCodeInApp: true
 };
 
@@ -131,7 +131,7 @@ export function AuthForms() {
       // Save the email for later use
       window.localStorage.setItem('emailForSignIn', email);
 
-      await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+      await sendSignInLinkToEmail(auth, email, actionCodeSettings as any);
       setEmailSent(true);
       
       toast({

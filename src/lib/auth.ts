@@ -21,12 +21,6 @@ declare module "next-auth" {
   }
 }
 
-interface Token {
-  id?: string;
-  phoneNumber?: string | null;
-  idToken?: string;
-}
-
 const verifyToken = async (token: string): Promise<DecodedIdToken | null> => {
   if (process.env.NODE_ENV === 'development') {
     // In development, parse the token directly since it's from the emulator
