@@ -3,7 +3,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BusinessSettings } from "@/components/dashboard/settings/business-settings";
 import { ProfileSettings } from "@/components/dashboard/settings/profile-settings";
-import { NotificationSettings } from "@/components/dashboard/settings/notification-settings";
 
 export default function SettingsPage() {
   return (
@@ -15,7 +14,6 @@ export default function SettingsPage() {
           <TabsList>
             <TabsTrigger value="business">Business</TabsTrigger>
             <TabsTrigger value="profile">Profile</TabsTrigger>
-            <TabsTrigger value="notifications">Notifications</TabsTrigger>
           </TabsList>
 
           <TabsContent value="business">
@@ -26,9 +24,6 @@ export default function SettingsPage() {
             <ProfileSettings />
           </TabsContent>
 
-          <TabsContent value="notifications">
-            <NotificationSettings />
-          </TabsContent>
         </Tabs>
       </div>
     </div>

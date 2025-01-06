@@ -1,5 +1,5 @@
 export const WHATSAPP_CONFIG = {
-  phoneNumber: "447949366218", // Your WhatsApp business number
+  phoneNumber: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER, // Your WhatsApp business number
   defaultMessage: "Hi! I'd like to start tracking my expenses.",
   getWhatsAppUrl: (message: string = "") => {
     const baseNumber = WHATSAPP_CONFIG.phoneNumber;

@@ -1,153 +1,351 @@
 'use client';
 
-import { 
-  MessageSquareIcon, 
-  ImageIcon, 
+import { BusinessService } from '@/lib/firebase/services/business-service';
+import { formatDistanceToNow } from 'date-fns';
+import {
+  AlertCircleIcon,
+  ArrowDownIcon,
+  BarChartIcon,
+  BuildingIcon,
+  CalendarIcon,
+  CheckCircleIcon,
+  ChevronRightIcon,
+  CreditCardIcon,
+  DollarSignIcon,
+  ExternalLinkIcon,
+  FileIcon,
   FileSpreadsheetIcon,
   FolderIcon,
-  CheckCircleIcon,
-  AlertCircleIcon,
-  LoaderIcon
+  FolderTreeIcon,
+  HashIcon,
+  LinkIcon,
+  LoaderIcon,
+  MessageSquareIcon,
+  ReceiptIcon,
+  TableIcon,
+  TagIcon
 } from "lucide-react";
+import { useSession } from 'next-auth/react';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
 
-type Activity = {
+interface Action {
   id: string;
-  type: 'message' | 'image' | 'spreadsheet' | 'folder';
-  status: 'success' | 'processing' | 'failed';
-  message: string;
-  details: string;
+  action_type: string;
+  status: string;
   timestamp: string;
-  metadata?: {
-    amount?: string;
-    category?: string;
-    spreadsheet?: string;
-    folder?: string;
-  };
-};
-
-const mockActivities: Activity[] = [
-  {
-    id: '1',
-    type: 'image',
-    status: 'success',
-    message: 'Receipt processed successfully',
-    details: 'Grocery shopping at Tesco',
-    timestamp: '2 minutes ago',
-    metadata: {
-      amount: '£45.99',
-      category: 'Groceries',
-      spreadsheet: 'March 2024 Expenses'
-    }
-  },
-  {
-    id: '2',
-    type: 'message',
-    status: 'processing',
-    message: 'Processing transaction message',
-    details: 'Monthly rent payment',
-    timestamp: 'Just now',
-    metadata: {
-      amount: '£1,200.00'
-    }
-  },
-  {
-    id: '3',
-    type: 'spreadsheet',
-    status: 'success',
-    message: 'New spreadsheet created',
-    details: 'Q1 2024 Financial Summary',
-    timestamp: '10 minutes ago',
-    metadata: {
-      folder: 'Financial Reports'
-    }
-  }
-];
-
-const getActivityIcon = (type: Activity['type'], status: Activity['status']) => {
-  const baseClass = "h-5 w-5";
-  const statusColors = {
-    success: 'text-green-600',
-    processing: 'text-blue-600',
-    failed: 'text-red-600'
-  };
-
-  switch (type) {
-    case 'message':
-      return <MessageSquareIcon className={`${baseClass} ${statusColors[status]}`} />;
-    case 'image':
-      return <ImageIcon className={`${baseClass} ${statusColors[status]}`} />;
-    case 'spreadsheet':
-      return <FileSpreadsheetIcon className={`${baseClass} ${statusColors[status]}`} />;
-    case 'folder':
-      return <FolderIcon className={`${baseClass} ${statusColors[status]}`} />;
-  }
-};
-
-const getStatusIcon = (status: Activity['status']) => {
-  switch (status) {
-    case 'success':
-      return <CheckCircleIcon className="h-4 w-4 text-green-600" />;
-    case 'processing':
-      return <LoaderIcon className="h-4 w-4 text-blue-600 animate-spin" />;
-    case 'failed':
-      return <AlertCircleIcon className="h-4 w-4 text-red-600" />;
-  }
-};
+  type?: string;
+  content?: string;
+  document_url?: string;
+  document_type?: string;
+  url?: string;
+  name?: string;
+  amount?: number;
+  category?: string;
+  merchant?: string;
+  description?: string;
+  spreadsheet_url?: string;
+  month?: string;
+  year?: string;
+}
 
 export function ActivityFeed() {
+  const { data: session } = useSession();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activities, setActivities] = useState<Action[]>([]);
+  const [showAll, setShowAll] = useState(false);
+
+  useEffect(() => {
+    async function loadActivities() {
+      try {
+        if (session?.user?.email) {
+          const business = await BusinessService.getBusinessByUserEmail(session.user.email);
+          if (business) {
+            const actions = await BusinessService.getBusinessActions(business.id);
+            setActivities(actions as any);
+          }
+        }
+      } catch (err) {
+        console.error('Error loading activities:', err);
+        setError('Failed to load activities');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadActivities();
+  }, [session]);
+
+  const getActionIcon = (action: Action) => {
+    const baseClass = "h-5 w-5";
+    const statusColors: { [key: string]: string } = {
+      completed: 'text-green-600',
+      processing: 'text-blue-600',
+      failed: 'text-red-600'
+    };
+    const color = statusColors[action.status] || 'text-gray-600';
+
+    switch (action.action_type) {
+      case 'message_received':
+      case 'message_sent':
+        return <MessageSquareIcon className={`${baseClass} ${color}`} />;
+      case 'document_stored':
+        return <ReceiptIcon className={`${baseClass} ${color}`} />;
+      case 'spreadsheet_created':
+        return <FileSpreadsheetIcon className={`${baseClass} ${color}`} />;
+      case 'folder_created':
+        return <FolderIcon className={`${baseClass} ${color}`} />;
+      case 'transaction_recorded':
+        return action.amount ? (
+          <div className={`${color} font-semibold`}>£{action.amount.toFixed(2)}</div>
+        ) : (
+          <FileIcon className={`${baseClass} ${color}`} />
+        );
+      default:
+        return <FileIcon className={`${baseClass} ${color}`} />;
+    }
+  };
+
+  const getActionTitle = (action: Action) => {
+    switch (action.action_type) {
+      case 'message_received':
+        return 'Message received';
+      case 'message_sent':
+        return 'Message sent';
+      case 'document_stored':
+        return `${action.document_type?.charAt(0).toUpperCase()}${action.document_type?.slice(1)} stored`;
+      case 'spreadsheet_created':
+        return `Spreadsheet created for ${action.month} ${action.year}`;
+      case 'folder_created':
+        return `Folder "${action.name}" created`;
+      case 'transaction_recorded':
+        return `Transaction recorded${action.merchant ? ` for ${action.merchant}` : ''}`;
+      default:
+        return action.action_type.replace(/_/g, ' ');
+    }
+  };
+
+  const getActionDetails = (action: Action) => {
+    switch (action.action_type) {
+      case 'message_received':
+      case 'message_sent':
+        if (action.type === 'transaction_confirmation') {
+          const links = extractLinks(action.content || '');
+          const details = parseTransactionMessage(action.content || '');
+          
+          return (
+            <div className="space-y-3">
+              {/* Transaction Details Section */}
+              <div className="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-lg">
+                <div className="flex items-center gap-2 text-sm">
+                  <HashIcon className="h-4 w-4 text-gray-400" />
+                  <span className="text-gray-600 font-mono">{details.id}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <DollarSignIcon className="h-4 w-4 text-emerald-500" />
+                  <span className="font-semibold">£{details.amount}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <CalendarIcon className="h-4 w-4 text-blue-400" />
+                  <span>{details.date}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <CreditCardIcon className="h-4 w-4 text-purple-400" />
+                  <span>{details.paymentMethod}</span>
+                </div>
+                <div className="col-span-2 flex items-center gap-2 text-sm">
+                  <BuildingIcon className="h-4 w-4 text-gray-400" />
+                  <span className="font-medium">{details.merchant}</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    <TagIcon className="h-3 w-3 mr-1" />
+                    {details.category}
+                  </span>
+                </div>
+              </div>
+
+              {/* Quick Links Section */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Quick Access</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {links.map((link, index) => (
+                    <Link
+                      key={index}
+                      href={link.url}
+                      target="_blank"
+                      className={`flex items-center gap-2 p-2 rounded-md text-sm transition-colors ${
+                        getLinkStyle(link.type)
+                      }`}
+                    >
+                      {getLinkIcon(link.type)}
+                      <span className="truncate">{link.label}</span>
+                      <ExternalLinkIcon className="h-3 w-3 flex-shrink-0 ml-auto" />
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        }
+        return action.content || 'No content';
+      case 'document_stored':
+        return action.document_url ? (
+          <Link 
+            href={action.document_url}
+            target="_blank"
+            className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+          >
+            View document <ExternalLinkIcon className="h-3 w-3" />
+          </Link>
+        ) : null;
+      case 'transaction_recorded':
+        return (
+          <div className="flex flex-wrap gap-2">
+            {action.category && (
+              <span className="inline-flex items-center px-2 py-1 rounded-md bg-blue-50 text-xs font-medium text-blue-700">
+                {action.category}
+              </span>
+            )}
+            {action.description && (
+              <span className="text-gray-600">{action.description}</span>
+            )}
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  // Helper functions
+  const parseTransactionMessage = (content: string) => {
+    const lines = content.split('\n');
+    return {
+      id: lines.find(l => l.includes('🆔'))?.split('🆔')[1].trim() || '',
+      amount: lines.find(l => l.includes('💰'))?.split('£')[1].trim() || '',
+      date: lines.find(l => l.includes('📅'))?.split('📅')[1].trim() || '',
+      category: lines.find(l => l.includes('🏷️'))?.split('🏷️')[1].trim() || '',
+      paymentMethod: lines.find(l => l.includes('💳'))?.split('💳')[1].trim() || '',
+      merchant: lines.find(l => l.includes('merchant'))?.split('merchant:')[1].trim() || ''
+    };
+  };
+
+  const extractLinks = (content: string) => {
+    const lines = content.split('\n');
+    return lines
+      .filter(line => line.includes('http') && !line.toLowerCase().includes('dashboard'))
+      .map(line => {
+        const url = line.match(/(https?:\/\/[^\s]+)/g)?.[0] || '';
+        const type = line.toLowerCase().includes('spreadsheet') ? 'spreadsheet' : 
+                     line.toLowerCase().includes('folder') ? 'folder' : 'other';
+        const label = type === 'spreadsheet' ? 'View Spreadsheet' :
+                     type === 'folder' ? 'Open Folder' : 'View';
+        return { url, type, label };
+      });
+  };
+
+  const getLinkStyle = (type: string) => {
+    switch (type) {
+      case 'spreadsheet':
+        return 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100';
+      case 'folder':
+        return 'bg-blue-50 text-blue-700 hover:bg-blue-100';
+      case 'dashboard':
+        return 'bg-purple-50 text-purple-700 hover:bg-purple-100';
+      default:
+        return 'bg-gray-50 text-gray-700 hover:bg-gray-100';
+    }
+  };
+
+  const getLinkIcon = (type: string) => {
+    switch (type) {
+      case 'spreadsheet':
+        return <TableIcon className="h-4 w-4" />;
+      case 'folder':
+        return <FolderTreeIcon className="h-4 w-4" />;
+      case 'dashboard':
+        return <BarChartIcon className="h-4 w-4" />;
+      default:
+        return <LinkIcon className="h-4 w-4" />;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+      </div>
+    );
+  }
+
+  const displayedActivities = showAll ? activities : activities.slice(0, 5);
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200">
       <div className="p-6 border-b border-gray-200">
-        <h2 className="text-lg font-semibold">Recent AI Activity</h2>
-        <p className="text-sm text-gray-500">WhatsApp messages and file changes</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Recent AI Activity</h2>
+            <p className="text-sm text-gray-500">Real-time updates of AI processing</p>
+          </div>
+          {activities.length > 5 && (
+            <Link 
+              href="/dashboard/activity"
+              className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+            >
+              View all <ChevronRightIcon className="h-4 w-4" />
+            </Link>
+          )}
+        </div>
       </div>
       <div className="divide-y divide-gray-100">
-        {mockActivities.map((activity) => (
+        {displayedActivities.map((activity) => (
           <div key={activity.id} className="p-4 hover:bg-gray-50 transition-colors">
             <div className="flex items-start gap-4">
               <div className={`p-2 rounded-lg ${
-                activity.status === 'success' ? 'bg-green-50' :
+                activity.status === 'completed' ? 'bg-green-50' :
                 activity.status === 'processing' ? 'bg-blue-50' :
                 'bg-red-50'
               }`}>
-                {getActivityIcon(activity.type, activity.status)}
+                {getActionIcon(activity)}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-900">{activity.message}</span>
-                  {getStatusIcon(activity.status)}
+                  <span className="font-medium text-gray-900">
+                    {getActionTitle(activity)}
+                  </span>
+                  {activity.status === 'completed' && (
+                    <CheckCircleIcon className="h-4 w-4 text-green-600" />
+                  )}
+                  {activity.status === 'processing' && (
+                    <LoaderIcon className="h-4 w-4 text-blue-600 animate-spin" />
+                  )}
+                  {activity.status === 'failed' && (
+                    <AlertCircleIcon className="h-4 w-4 text-red-600" />
+                  )}
                 </div>
-                <p className="text-sm text-gray-600 mt-1">{activity.details}</p>
-                {activity.metadata && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {activity.metadata.amount && (
-                      <span className="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-xs font-medium text-gray-600">
-                        {activity.metadata.amount}
-                      </span>
-                    )}
-                    {activity.metadata.category && (
-                      <span className="inline-flex items-center px-2 py-1 rounded-md bg-blue-50 text-xs font-medium text-blue-700">
-                        {activity.metadata.category}
-                      </span>
-                    )}
-                    {activity.metadata.spreadsheet && (
-                      <span className="inline-flex items-center px-2 py-1 rounded-md bg-green-50 text-xs font-medium text-green-700">
-                        📊 {activity.metadata.spreadsheet}
-                      </span>
-                    )}
-                    {activity.metadata.folder && (
-                      <span className="inline-flex items-center px-2 py-1 rounded-md bg-yellow-50 text-xs font-medium text-yellow-700">
-                        📁 {activity.metadata.folder}
-                      </span>
-                    )}
-                  </div>
-                )}
-                <p className="text-xs text-gray-400 mt-2">{activity.timestamp}</p>
+                <div className="mt-1">
+                  {getActionDetails(activity)}
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
+                </p>
               </div>
             </div>
           </div>
         ))}
       </div>
+      {activities.length > 5 && !showAll && (
+        <div className="p-4 border-t border-gray-100">
+          <button
+            onClick={() => setShowAll(true)}
+            className="w-full text-sm text-gray-600 hover:text-gray-900 flex items-center justify-center gap-2"
+          >
+            Show more <ArrowDownIcon className="h-4 w-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 } 
