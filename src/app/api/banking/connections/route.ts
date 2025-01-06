@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { BusinessService } from '@/lib/firebase/services/business-service';
 
-const FLASK_API_URL = process.env.FLASK_API_URL || 'http://127.0.0.1:9004';
+const FLASK_API_URL = process.env.NEXT_PUBLIC_FLASK_API_URL;
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);

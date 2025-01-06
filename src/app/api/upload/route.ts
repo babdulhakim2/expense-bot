@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 
-const FLASK_API_URL = process.env.FLASK_API_URL || 'http://127.0.0.1:9004';
+const FLASK_API_URL = process.env.NEXT_PUBLIC_FLASK_API_URL;
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);

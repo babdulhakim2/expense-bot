@@ -1,12 +1,9 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from "next-auth/next";
-import { db } from '@/lib/firebase/firebase';
 import { authOptions } from "@/lib/auth";
-import { doc, getDoc } from 'firebase/firestore';
-import { BusinessService, type Business } from '@/lib/firebase/services/business-service';
+import { getServerSession } from "next-auth/next";
+import { NextResponse } from 'next/server';
 
 
-const FLASK_API_URL = process.env.FLASK_API_URL || 'http://127.0.0.1:9004';
+const FLASK_API_URL = process.env.NEXT_PUBLIC_FLASK_API_URL;
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
