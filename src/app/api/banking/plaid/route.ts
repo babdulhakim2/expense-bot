@@ -12,12 +12,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Make sure PYTHON_API_URL is properly set and formatted
-    const baseUrl = process.env.PYTHON_API_URL || 'http://localhost:9004';
-    console.log('Environment:', {
-      PYTHON_API_URL: process.env.PYTHON_API_URL,
-      NODE_ENV: process.env.NODE_ENV
-    });
+    const baseUrl = process.env.NEXT_PUBLIC_FLASK_API_URL;
 
     console.log(`Making request to: ${baseUrl}/api/banking/plaid/${action}`);
 
