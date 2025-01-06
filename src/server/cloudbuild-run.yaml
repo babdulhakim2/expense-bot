@@ -32,7 +32,7 @@ steps:
     args:
       - "run"
       - "deploy"
-      - "rekroot-tasks"
+      - "expense-bot-api"
       - "--image=us-central1-docker.pkg.dev/${_PROJECT_ID}/backend/api:latest"
       - "--platform=managed"
       - "--region=${_REGION}"
