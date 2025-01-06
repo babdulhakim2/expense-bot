@@ -33,7 +33,7 @@ steps:
       - "--platform=managed"
       - "--region=${_REGION}"
       - "--memory=4Gi"
-      - "--cpu=4"
+      - "--cpu=2"
       - "--min-instances=0"
       - "--max-instances=4"
       - "--allow-unauthenticated"
