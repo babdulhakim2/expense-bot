@@ -152,6 +152,18 @@ export function DashboardOverview() {
   };
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    // Warn if multiple files are dropped
+    if (acceptedFiles.length > 1) {
+      toast({
+        title: "Only one file allowed",
+        description: "Please upload files one at a time",
+      });
+    }
+
+    // Take only the first file
+    const file = acceptedFiles[0];
+    if (!file) return;
+
     setUploading(true);
     try {
       // Get the business ID first
@@ -160,33 +172,32 @@ export function DashboardOverview() {
         throw new Error('No active business found');
       }
 
-      for (const file of acceptedFiles) {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('businessId', business.id);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('businessId', business.id);
 
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
 
-        const data = await response.json();
+      const data = await response.json();
 
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to upload file');
-        }
-
-        // Show success toast
-        toast({
-          title: "Success",
-          description: `Successfully processed ${file.name}`,
-        })
-
-        // Refresh actions and stats
-        const newActions = await BusinessService.getBusinessActions(business.id);
-        setActions(newActions as any);
-        calculateStats(newActions as any);
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to upload file');
       }
+
+      // Show success toast
+      toast({
+        title: "Success",
+        description: `Successfully processed ${file.name}`,
+      })
+
+      // Refresh actions and stats
+      const newActions = await BusinessService.getBusinessActions(business.id);
+      setActions(newActions as any);
+      calculateStats(newActions as any);
+
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -204,7 +215,27 @@ export function DashboardOverview() {
       'application/pdf': ['.pdf'],
       'image/*': ['.png', '.jpg', '.jpeg']
     },
-    multiple: true // Allow multiple files
+    multiple: false,
+    maxFiles: 1,
+    onDropRejected: (rejectedFiles) => {
+      if (rejectedFiles.length > 1) {
+        toast({
+          title: "Multiple files detected",
+          description: "Please upload only one file at a time",
+          variant: "destructive"
+        });
+      } else {
+        // Handle other rejection reasons (file type, size, etc.)
+        const error = rejectedFiles[0]?.errors[0];
+        if (error) {
+          toast({
+            title: "Invalid file",
+            description: error.message,
+            variant: "destructive"
+          });
+        }
+      }
+    }
   });
 
   return (
@@ -225,15 +256,15 @@ export function DashboardOverview() {
           <UploadCloudIcon className={`h-12 w-12 ${isDragActive ? 'text-blue-500' : 'text-gray-400'}`} />
           <p className="text-sm text-gray-600 text-center">
             {uploading ? (
-              "Processing files..."
+              "Processing file..."
             ) : isDragActive ? (
-              "Drop your files here..."
+              "Drop your file here..."
             ) : (
               <>
-                Drag & drop files here, or <span className="text-blue-500">click to select files</span>
+                Drag & drop a file here, or <span className="text-blue-500">click to select file</span>
                 <br />
                 <span className="text-xs text-gray-500">
-                  Supports PDF and images (PNG, JPG, GIF)
+                  Supports PDF and images (PNG, JPG)
                 </span>
               </>
             )}
