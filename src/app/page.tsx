@@ -12,15 +12,22 @@ export default function Home() {
   const { data: session } = useSession();
 
   return (
-    <main className="min-h-screen flex flex-col items-center">
-      <div className="w-full max-w-6xl mx-auto px-4 py-12 space-y-20">
-        <HeroSection isAuthenticated={!!session} />
-        <div className="flex justify-center">
-          <AuthForms />
+    <main className="min-h-screen flex flex-col">
+      <div className="w-full max-w-6xl mx-auto px-4">
+        {/* Hero and Auth section */}
+        <div className="flex flex-col">
+          <HeroSection isAuthenticated={!!session} />
+          <div className="flex justify-center -mt-2 sm:-mt-4">
+            <AuthForms />
+          </div>
         </div>
-        <FeaturesGrid />
-        <PoweredBySection />
-        <GithubBanner />
+
+        {/* Rest of the sections */}
+        <div className="space-y-20 py-20">
+          <FeaturesGrid />
+          <PoweredBySection />
+          <GithubBanner />
+        </div>
       </div>
     </main>
   );
