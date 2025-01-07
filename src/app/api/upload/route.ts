@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 
+export const maxDuration = 5; // This function can run for a maximum of 5 seconds
+export const dynamic = 'force-dynamic';
+
 const FLASK_API_URL = process.env.NEXT_PUBLIC_FLASK_API_URL;
 
 export async function POST(request: Request) {
