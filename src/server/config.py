@@ -54,6 +54,9 @@ class Config:
     OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
     SITE_URL = os.getenv('SITE_URL', 'https://expensebot.xyz')
     
+    # Google Drive Base Path
+    GOOGLE_DRIVE_BASE_PATH = os.getenv('GOOGLE_DRIVE_BASE_PATH', 'ExpenseBot-Dev')
+    
     @classmethod
     def validate_config(cls):
         """Validate required configuration values"""

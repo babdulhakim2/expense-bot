@@ -369,14 +369,27 @@ class FirebaseService:
                 if not owner_email:
                     raise ValueError(f"Owner email not found for business {business_id}")
 
-                # Create new business folder in Drive with retry
+                # Create new "Expense Bot Root" folder first
                 try:
-                    drive_folder = self.drive_service.create_folder(
-                        folder_name=business_name
+                    root_folder = self.drive_service.create_folder(
+                        folder_name=Config.GOOGLE_DRIVE_BASE_PATH
                     )
                 except ssl.SSLError as e:
                     retry_count += 1
-                    logger.warning(f"SSL Error creating folder (attempt {retry_count}/{max_retries}): {str(e)}")
+                    logger.warning(f"SSL Error creating root folder (attempt {retry_count}/{max_retries}): {str(e)}")
+                    if retry_count == max_retries:
+                        raise
+                    continue
+
+                # Create business folder inside "Expense Bot Root"
+                try:
+                    drive_folder = self.drive_service.create_folder(
+                        folder_name=business_name,
+                        parent_id=root_folder['id']
+                    )
+                except ssl.SSLError as e:
+                    retry_count += 1
+                    logger.warning(f"SSL Error creating business folder (attempt {retry_count}/{max_retries}): {str(e)}")
                     if retry_count == max_retries:
                         raise
                     continue
@@ -389,15 +402,24 @@ class FirebaseService:
                         'type': 'business_root',
                         'name': drive_folder['name'],
                         'drive_folder_id': drive_folder['id'],
-                        'url': drive_folder['url']
+                        'url': drive_folder['url'],
+                        'root_folder_id': root_folder['id']
                     },
                     related_id=drive_folder['id']
                 )
 
-                # Set permissions
+                # Set permissions for both folders
                 service_account = json.loads(Config.SERVICE_ACCOUNT_KEY)
                 service_account_email = service_account['client_email']
                 
+                # Set permissions for root folder
+                self.drive_service.set_permissions(
+                    root_folder['id'],
+                    owner_email,
+                    service_account_email
+                )
+                
+                # Set permissions for business folder
                 self.drive_service.set_permissions(
                     drive_folder['id'],
                     owner_email,
@@ -411,7 +433,9 @@ class FirebaseService:
                     'url': drive_folder['url'],
                     'type': 'business_root',
                     'business_id': business_id,
-                    'action_id': action_id
+                    'action_id': action_id,
+                    'root_folder_id': root_folder['id'],
+                    'root_folder_name': 'Expense Bot Root'
                 }
                 
                 folder_id = self.store_folder_metadata(business_id, folder_data)
@@ -421,7 +445,8 @@ class FirebaseService:
                     'drive_id': drive_folder['id'],
                     'name': drive_folder['name'],
                     'url': drive_folder['url'],
-                    'type': 'business_root'
+                    'type': 'business_root',
+                    'root_folder_id': root_folder['id']
                 }
                 
             except Exception as e:
