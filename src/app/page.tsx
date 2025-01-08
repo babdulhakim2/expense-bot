@@ -7,9 +7,21 @@ import { FeaturesGrid } from '@/components/landing/features-grid';
 import { GithubBanner } from '@/components/landing/github-banner';
 import { HeroSection } from '@/components/landing/hero-section';
 import { PoweredBySection } from '@/components/landing/powered-by-section';
+// import { useEffect } from 'react';
+// import posthog from 'posthog-js';
 
 export default function Home() {
   const { data: session } = useSession();
+
+  // useEffect(() => {
+  //   // Identify user when they're logged in
+  //   if (session?.user) {
+  //     posthog.identify(session.user.id, {
+  //       email: session.user.email,
+  //       name: session.user.name,
+  //     });
+  //   }
+  // }, [session]);
 
   return (
     <main className="min-h-screen flex flex-col">
