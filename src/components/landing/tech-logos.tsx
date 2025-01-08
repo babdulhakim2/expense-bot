@@ -28,10 +28,10 @@ const logos = [
     className: "w-11 h-11"
   },
   {
-    src: "/images/tech/twilio.webp",
-    alt: "Twilio",
-    link: "https://www.twilio.com",
-    className: "w-10 h-10"
+    src: "/images/tech/g-cloud.png",
+    alt: "Google Cloud",
+    link: "https://cloud.google.com",
+    className: "w-11 h-11"
   }
 ];
 
