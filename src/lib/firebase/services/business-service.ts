@@ -5,6 +5,9 @@ export type Business = {
   id: string;
   name: string;
   type: string;
+  location?: string;
+  businessNumber?: string;
+  currency?: string;
   createdAt: Date;
   updatedAt: Date;
   ownerId: string;
@@ -162,6 +165,9 @@ export class BusinessService {
       id: data.id,
       name: data.name,
       type: data.type,
+      location: data.location || '',
+      currency: data.currency || '',
+      businessNumber: data.businessNumber || '',
       createdAt: data.createdAt.toDate(),
       updatedAt: data.updatedAt.toDate(),
       ownerId: data.ownerId,
@@ -171,8 +177,17 @@ export class BusinessService {
 
   static async updateBusiness(businessId: string, data: Partial<Omit<Business, 'id' | 'createdAt' | 'ownerId' | 'ownerEmail'>>) {
     const businessRef = doc(db, 'businesses', businessId);
+    
+    // Filter out undefined values
+    const cleanData = Object.entries(data).reduce((acc, [key, value]) => {
+      if (value !== undefined && value !== '') {
+        acc[key] = value;
+      }
+      return acc;
+    }, {} as Record<string, any>);
+
     const updateData = {
-      ...data,
+      ...cleanData,
       updatedAt: new Date(),
     };
 

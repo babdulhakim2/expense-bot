@@ -7,7 +7,7 @@ import 'react-phone-number-input/style.css';
 import { CheckCircle2, XCircle } from "lucide-react";
 
 // Define the countries we want to allow
-const allowedCountries: Country[] = ['GB', 'US'];
+const allowedCountries: Country[] = ['CA','GB', 'US'];
 
 interface PhoneNumberInputProps {
   value: string;
