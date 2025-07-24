@@ -1,0 +1,9 @@
+{
+  "projects": {
+    "default": "expense-bot-9906c",
+    "expense-bot": "expense-bot-9906c",
+    "y": "expense-bot-firebase"
+  },
+  "targets": {},
+  "etags": {}
+}
