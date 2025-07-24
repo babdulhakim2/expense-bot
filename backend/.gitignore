@@ -38,7 +38,8 @@ venv.bak/
 .env.local
 .env.development.local
 .env.test.local
-.env.production.local
+.env.production
+*.production
 
 # Testing
 .coverage
@@ -71,3 +72,5 @@ env_variables.yaml
 env_secrets.yaml
 .env
 .env.yaml
+dataset
+models

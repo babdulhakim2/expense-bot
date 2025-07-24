@@ -927,57 +927,57 @@ class FirebaseService:
             })
             
             # If there's media content, handle storage based on environment
-            if message_data.get('media_content'):
-                media_path = f"businesses/{business_id}/messages/{message_ref.id}/media"
+            # if message_data.get('media_content'):
+            #     media_path = f"businesses/{business_id}/messages/{message_ref.id}/media"
                 
-                if self.is_emulated:
-                    # Handle storage emulator
-                    try:
-                        # Store media content reference for emulator
-                        media_url = f"{self.storage_host}/{Config.FIREBASE_STORAGE_BUCKET}/{media_path}"
+            #     if self.is_emulated:
+            #         # Handle storage emulator
+            #         try:
+            #             # Store media content reference for emulator
+            #             media_url = f"{self.storage_host}/{Config.FIREBASE_STORAGE_BUCKET}/{media_path}"
                         
-                        # In development, we might want to just store the content length
-                        # or hash instead of actually uploading
-                        media_data = message_data['media_content']
-                        content_length = len(media_data) if isinstance(media_data, bytes) else len(str(media_data))
+            #             # In development, we might want to just store the content length
+            #             # or hash instead of actually uploading
+            #             media_data = message_data['media_content']
+            #             content_length = len(media_data) if isinstance(media_data, bytes) else len(str(media_data))
                         
-                        message_data.update({
-                            'media_url': media_url,
-                            'media_path': media_path,
-                            'media_size': content_length,
-                            'media_type': message_data.get('media_type', 'application/octet-stream'),
-                            'environment': 'development'
-                        })
+            #             message_data.update({
+            #                 'media_url': media_url,
+            #                 'media_path': media_path,
+            #                 'media_size': content_length,
+            #                 'media_type': message_data.get('media_type', 'application/octet-stream'),
+            #                 'environment': 'development'
+            #             })
                         
-                        logger.info(f"Emulator: Stored media reference at {media_url}")
+            #             logger.info(f"Emulator: Stored media reference at {media_url}")
                         
-                    except Exception as e:
-                        logger.warning(f"Emulator: Failed to handle media: {str(e)}")
-                        # Continue without media in development
-                        message_data['media_error'] = str(e)
-                else:
-                    # Production storage handling
-                    media_blob = self.bucket.blob(media_path)
-                    media_blob.upload_from_string(
-                        message_data['media_content'],
-                        content_type=message_data.get('media_type', 'application/octet-stream')
-                    )
+            #         except Exception as e:
+            #             logger.warning(f"Emulator: Failed to handle media: {str(e)}")
+            #             # Continue without media in development
+            #             message_data['media_error'] = str(e)
+            #     else:
+            #         # Production storage handling
+            #         media_blob = self.bucket.blob(media_path)
+            #         media_blob.upload_from_string(
+            #             message_data['media_content'],
+            #             content_type=message_data.get('media_type', 'application/octet-stream')
+            #         )
                     
-                    # Generate a signed URL that expires in 7 days
-                    media_url = media_blob.generate_signed_url(
-                        version="v4",
-                        expiration=datetime.timedelta(days=7),
-                        method="GET"
-                    )
+            #         # Generate a signed URL that expires in 7 days
+            #         media_url = media_blob.generate_signed_url(
+            #             version="v4",
+            #             expiration=datetime.timedelta(days=7),
+            #             method="GET"
+            #         )
                     
-                    message_data.update({
-                        'media_url': media_url,
-                        'media_path': media_path,
-                        'environment': 'production'
-                    })
+            #         message_data.update({
+            #             'media_url': media_url,
+            #             'media_path': media_path,
+            #             'environment': 'production'
+            #         })
                 
-                # Remove the raw content from the stored data
-                del message_data['media_content']
+            #     # Remove the raw content from the stored data
+            #     del message_data['media_content']
             
             message_ref.set(message_data)
             

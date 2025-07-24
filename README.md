@@ -7,7 +7,7 @@ ExpenseBot is an open-source WhatsApp-based bookkeeping assistant that automatic
 ## How It Works
 
 <div align="center">
-  <img src="/public/Expense-bot.png" alt="ExpenseBot Process Flow" width="800"/>
+  <img src="/frontend/public/Expense-bot.png" alt="ExpenseBot Process Flow" width="800"/>
   <p><em>ExpenseBot's Receipt Processing Workflow</em></p>
 </div>
 
