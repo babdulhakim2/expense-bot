@@ -1,4 +1,4 @@
-import { FileSpreadsheetIcon, PlusIcon, SearchIcon, StarIcon, BarChart2Icon, TableIcon } from "lucide-react";
+import { FileSpreadsheetIcon, PlusIcon, SearchIcon, StarIcon, BarChart2Icon } from "lucide-react";
 
 type Spreadsheet = {
   id: string;

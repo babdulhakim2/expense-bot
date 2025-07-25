@@ -38,7 +38,7 @@ interface Stats {
 
 export function DashboardOverview() {
   const { currentBusiness, hasBusinesses, isInitialized } = useBusiness();
-  const [actions, setActions] = useState<AIAction[]>([]);
+  const [actions, setActions] = useState<AIAction[]>([]); // eslint-disable-line @typescript-eslint/no-unused-vars
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<Stats[]>([]);
   const [uploading, setUploading] = useState(false);

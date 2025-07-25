@@ -9,7 +9,7 @@ export default async function DashboardRootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getServerSession(authOptions);
+  const session = await getServerSession(authOptions as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
   if (!session) {
     redirect("/");
