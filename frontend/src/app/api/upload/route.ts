@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 const FLASK_API_URL = process.env.NEXT_PUBLIC_FLASK_API_URL;
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
+  const session = await getServerSession(authOptions as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
   if (!session?.user) {
     return NextResponse.json(
