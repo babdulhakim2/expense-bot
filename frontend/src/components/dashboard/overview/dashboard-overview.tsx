@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { BusinessService } from '@/lib/firebase/services/business-service';
-import { subMonths } from 'date-fns';
+import { BusinessService } from "@/lib/firebase/services/business-service";
+import { subMonths } from "date-fns";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -9,13 +9,15 @@ import {
   FileSpreadsheetIcon,
   MessageSquareIcon,
   ReceiptIcon,
-  UploadCloudIcon
+  UploadCloudIcon,
 } from "lucide-react";
-import { useSession } from 'next-auth/react';
-import { useCallback, useEffect, useState } from 'react';
-import { useDropzone } from 'react-dropzone';
-import { ActivityFeed } from './activity-feed';
-import { toast } from "@/hooks/use-toast"
+import { useSession } from "next-auth/react";
+import { useCallback, useEffect, useState } from "react";
+import { useDropzone } from "react-dropzone";
+import { ActivityFeed } from "./activity-feed";
+import { toast } from "@/hooks/use-toast";
+import { useBusiness } from "@/app/providers/BusinessProvider";
+import { NoBusinessFallback } from "../business/no-business-fallback";
 
 interface Action {
   id: string;
@@ -30,12 +32,13 @@ interface Stats {
   value: string | number;
   icon: any;
   change: string;
-  trend: 'up' | 'down' | 'neutral';
+  trend: "up" | "down" | "neutral";
   tooltip?: string;
 }
 
 export function DashboardOverview() {
   const { data: session } = useSession();
+  const { currentBusiness, hasBusinesses, isInitialized } = useBusiness();
   const [actions, setActions] = useState<Action[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<Stats[]>([]);
@@ -44,23 +47,31 @@ export function DashboardOverview() {
   useEffect(() => {
     async function loadData() {
       try {
-        if (session?.user?.email) {
-          const business = await BusinessService.getBusinessByUserEmail(session.user.email);
-          if (business) {
-            const actions = await BusinessService.getBusinessActions(business.id);
-            setActions(actions as any);
-            calculateStats(actions as any) ;
-          }
+        if (currentBusiness) {
+          const actions = await BusinessService.getBusinessActions(
+            currentBusiness.id
+          );
+          setActions(actions as any);
+          calculateStats(actions as any);
+        } else {
+          // No business - show empty state
+          setActions([]);
+          setStats([]);
         }
       } catch (err) {
-        console.error('Error loading dashboard data:', err);
+        console.error("Error loading dashboard data:", err);
+        // On Firebase error, fallback to empty state instead of crashing
+        setActions([]);
+        setStats([]);
       } finally {
         setLoading(false);
       }
     }
 
-    loadData();
-  }, [session]);
+    if (isInitialized) {
+      loadData();
+    }
+  }, [currentBusiness, isInitialized]);
 
   const calculateStats = (actions: Action[]) => {
     const now = new Date();
@@ -68,152 +79,172 @@ export function DashboardOverview() {
 
     // Current month's actions
     const currentMonthActions = actions.filter(
-      a => new Date(a.timestamp) >= lastMonth
+      (a) => new Date(a.timestamp) >= lastMonth
     );
 
     // Previous month's actions for comparison
     const previousMonthActions = actions.filter(
-      a => new Date(a.timestamp) >= subMonths(lastMonth, 1) && 
-          new Date(a.timestamp) < lastMonth
+      (a) =>
+        new Date(a.timestamp) >= subMonths(lastMonth, 1) &&
+        new Date(a.timestamp) < lastMonth
     );
 
     const calculateChange = (current: number, previous: number) => {
-      if (previous === 0) return current > 0 ? '+100%' : '0%';
+      if (previous === 0) return current > 0 ? "+100%" : "0%";
       const change = ((current - previous) / previous) * 100;
-      return `${change > 0 ? '+' : ''}${change.toFixed(1)}%`;
+      return `${change > 0 ? "+" : ""}${change.toFixed(1)}%`;
     };
 
-    const getTrend = (current: number, previous: number): 'up' | 'down' | 'neutral' => {
-      if (current === previous) return 'neutral';
-      return current > previous ? 'up' : 'down';
+    const getTrend = (
+      current: number,
+      previous: number
+    ): "up" | "down" | "neutral" => {
+      if (current === previous) return "neutral";
+      return current > previous ? "up" : "down";
     };
 
     // Calculate specific metrics
     const currentMessages = currentMonthActions.filter(
-      a => a.action_type === 'message_received' || a.action_type === 'message_sent'
+      (a) =>
+        a.action_type === "message_received" || a.action_type === "message_sent"
     ).length;
     const previousMessages = previousMonthActions.filter(
-      a => a.action_type === 'message_received' || a.action_type === 'message_sent'
+      (a) =>
+        a.action_type === "message_received" || a.action_type === "message_sent"
     ).length;
 
     const currentReceipts = currentMonthActions.filter(
-      a => a.action_type === 'document_stored'
+      (a) => a.action_type === "document_stored"
     ).length;
     const previousReceipts = previousMonthActions.filter(
-      a => a.action_type === 'document_stored'
+      (a) => a.action_type === "document_stored"
     ).length;
 
     const currentTransactions = currentMonthActions.filter(
-      a => a.action_type === 'transaction_recorded'
+      (a) => a.action_type === "transaction_recorded"
     );
     const previousTransactions = previousMonthActions.filter(
-      a => a.action_type === 'transaction_recorded'
+      (a) => a.action_type === "transaction_recorded"
     );
 
-    const currentAmount = currentTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
-    const previousAmount = previousTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+    const currentAmount = currentTransactions.reduce(
+      (sum, t) => sum + (t.amount || 0),
+      0
+    );
+    const previousAmount = previousTransactions.reduce(
+      (sum, t) => sum + (t.amount || 0),
+      0
+    );
 
     const newStats: Stats[] = [
       {
-        label: 'Messages Processed',
+        label: "Messages Processed",
         value: currentMessages,
         icon: MessageSquareIcon,
         change: calculateChange(currentMessages, previousMessages),
         trend: getTrend(currentMessages, previousMessages),
-        tooltip: 'Total WhatsApp messages processed this month'
+        tooltip: "Total WhatsApp messages processed this month",
       },
       {
-        label: 'Receipts Processed',
+        label: "Receipts Processed",
         value: currentReceipts,
         icon: ReceiptIcon,
         change: calculateChange(currentReceipts, previousReceipts),
         trend: getTrend(currentReceipts, previousReceipts),
-        tooltip: 'Documents and receipts processed this month'
+        tooltip: "Documents and receipts processed this month",
       },
       {
-        label: 'Transactions',
+        label: "Transactions",
         value: currentTransactions.length,
         icon: BarChart3Icon,
-        change: calculateChange(currentTransactions.length, previousTransactions.length),
-        trend: getTrend(currentTransactions.length, previousTransactions.length),
-        tooltip: 'Total transactions recorded this month'
+        change: calculateChange(
+          currentTransactions.length,
+          previousTransactions.length
+        ),
+        trend: getTrend(
+          currentTransactions.length,
+          previousTransactions.length
+        ),
+        tooltip: "Total transactions recorded this month",
       },
       {
-        label: 'Total Amount',
+        label: "Total Amount",
         value: `£${currentAmount.toFixed(2)}`,
         icon: FileSpreadsheetIcon,
         change: calculateChange(currentAmount, previousAmount),
         trend: getTrend(currentAmount, previousAmount),
-        tooltip: 'Total transaction amount this month'
-      }
+        tooltip: "Total transaction amount this month",
+      },
     ];
 
     setStats(newStats);
   };
 
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    // Warn if multiple files are dropped
-    if (acceptedFiles.length > 1) {
-      toast({
-        title: "Only one file allowed",
-        description: "Please upload files one at a time",
-      });
-    }
-
-    // Take only the first file
-    const file = acceptedFiles[0];
-    if (!file) return;
-
-    setUploading(true);
-    try {
-      // Get the business ID first
-      const business = await BusinessService.getBusinessByUserEmail(session?.user?.email!);
-      if (!business) {
-        throw new Error('No active business found');
+  const onDrop = useCallback(
+    async (acceptedFiles: File[]) => {
+      // Warn if multiple files are dropped
+      if (acceptedFiles.length > 1) {
+        toast({
+          title: "Only one file allowed",
+          description: "Please upload files one at a time",
+        });
       }
 
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('businessId', business.id);
+      // Take only the first file
+      const file = acceptedFiles[0];
+      if (!file) return;
 
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
+      setUploading(true);
+      try {
+        if (!currentBusiness) {
+          throw new Error("No active business found");
+        }
 
-      const data = await response.json();
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("businessId", currentBusiness.id);
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to upload file');
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to upload file");
+        }
+
+        // Show success toast
+        toast({
+          title: "Success",
+          description: `Successfully processed ${file.name}`,
+        });
+
+        // Refresh actions and stats
+        const newActions = await BusinessService.getBusinessActions(
+          currentBusiness.id
+        );
+        setActions(newActions as any);
+        calculateStats(newActions as any);
+      } catch (error: any) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: error.message || "Failed to process file",
+        });
+      } finally {
+        setUploading(false);
       }
-
-      // Show success toast
-      toast({
-        title: "Success",
-        description: `Successfully processed ${file.name}`,
-      })
-
-      // Refresh actions and stats
-      const newActions = await BusinessService.getBusinessActions(business.id);
-      setActions(newActions as any);
-      calculateStats(newActions as any);
-
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || 'Failed to process file',
-      })
-    } finally {
-      setUploading(false);
-    }
-  }, [session?.user?.email]);
+    },
+    [currentBusiness]
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'application/pdf': ['.pdf'],
-      'image/*': ['.png', '.jpg', '.jpeg']
+      "application/pdf": [".pdf"],
+      "image/*": [".png", ".jpg", ".jpeg"],
     },
     multiple: false,
     maxFiles: 1,
@@ -222,7 +253,7 @@ export function DashboardOverview() {
         toast({
           title: "Multiple files detected",
           description: "Please upload only one file at a time",
-          variant: "destructive"
+          variant: "destructive",
         });
       } else {
         // Handle other rejection reasons (file type, size, etc.)
@@ -231,29 +262,55 @@ export function DashboardOverview() {
           toast({
             title: "Invalid file",
             description: error.message,
-            variant: "destructive"
+            variant: "destructive",
           });
         }
       }
-    }
+    },
   });
+
+  // Show fallback UI if no business is selected
+  if (isInitialized && !hasBusinesses) {
+    return <NoBusinessFallback showInDashboard={true} />;
+  }
+
+  if (!isInitialized || loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center space-x-2">
+          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-sm text-muted-foreground">
+            Loading dashboard...
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
       {/* Bulk Upload dropzone */}
-      <div 
-        {...getRootProps()} 
+      <div
+        {...getRootProps()}
         className={`
           w-full border-2 border-dashed rounded-xl p-8
           transition-colors duration-200 ease-in-out cursor-pointer
           min-h-[180px] flex items-center justify-center
-          ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 bg-white'}
-          ${uploading ? 'opacity-50 cursor-not-allowed' : ''}
+          ${
+            isDragActive
+              ? "border-blue-500 bg-blue-50"
+              : "border-gray-300 hover:border-blue-400 bg-white"
+          }
+          ${uploading ? "opacity-50 cursor-not-allowed" : ""}
         `}
       >
         <input {...getInputProps()} disabled={uploading} />
         <div className="flex flex-col items-center justify-center gap-3">
-          <UploadCloudIcon className={`h-12 w-12 ${isDragActive ? 'text-blue-500' : 'text-gray-400'}`} />
+          <UploadCloudIcon
+            className={`h-12 w-12 ${
+              isDragActive ? "text-blue-500" : "text-gray-400"
+            }`}
+          />
           <p className="text-sm text-gray-600 text-center">
             {uploading ? (
               "Processing file..."
@@ -261,7 +318,8 @@ export function DashboardOverview() {
               "Drop your file here..."
             ) : (
               <>
-                Drag & drop a file here, or <span className="text-blue-500">click to select file</span>
+                Drag & drop a file here, or{" "}
+                <span className="text-blue-500">click to select file</span>
                 <br />
                 <span className="text-xs text-gray-500">
                   Supports PDF and images (PNG, JPG)
@@ -290,18 +348,22 @@ export function DashboardOverview() {
               </div>
             </div>
             <div className="mt-4 flex items-center">
-              {stat.trend === 'up' ? (
+              {stat.trend === "up" ? (
                 <ArrowUpIcon className="h-4 w-4 text-green-500" />
-              ) : stat.trend === 'down' ? (
+              ) : stat.trend === "down" ? (
                 <ArrowDownIcon className="h-4 w-4 text-red-500" />
               ) : (
                 <div className="h-4 w-4" /> // Placeholder for neutral trend
               )}
-              <span className={`ml-1 text-sm ${
-                stat.trend === 'up' ? 'text-green-500' : 
-                stat.trend === 'down' ? 'text-red-500' : 
-                'text-gray-500'
-              }`}>
+              <span
+                className={`ml-1 text-sm ${
+                  stat.trend === "up"
+                    ? "text-green-500"
+                    : stat.trend === "down"
+                    ? "text-red-500"
+                    : "text-gray-500"
+                }`}
+              >
                 {stat.change}
               </span>
               <span className="ml-2 text-sm text-gray-500">vs last month</span>
@@ -314,4 +376,4 @@ export function DashboardOverview() {
       <ActivityFeed />
     </div>
   );
-} 
+}

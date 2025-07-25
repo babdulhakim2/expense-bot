@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
 import { Building2Icon } from "lucide-react";
-import { useBusiness } from "@/contexts/business-context";
+import { useBusiness } from "@/app/providers/BusinessProvider";
 import { BUSINESS_CATEGORIES } from "@/lib/constants/business-categories";
 
 export function BusinessInfo() {
-  const { currentBusiness, isLoading } = useBusiness();
+  const { currentBusiness, loadingStates } = useBusiness();
 
-  if (isLoading) {
+  if (loadingStates.loading) {
     return (
       <div className="flex items-center gap-2 px-4 py-2 animate-pulse">
         <div className="h-5 w-5 bg-gray-700 rounded" />
@@ -18,16 +18,15 @@ export function BusinessInfo() {
       </div>
     );
   }
-
   if (!currentBusiness) {
     return (
-      <div className="px-4 py-2 text-sm text-gray-400">
-        No business access
-      </div>
+      <div className="px-4 py-2 text-sm text-gray-400">No business access</div>
     );
   }
 
-  const category = BUSINESS_CATEGORIES.find(cat => cat.id === currentBusiness.type) || BUSINESS_CATEGORIES[0];
+  const category =
+    BUSINESS_CATEGORIES.find((cat) => cat.id === currentBusiness.type) ||
+    BUSINESS_CATEGORIES[0];
 
   return (
     <div className="flex items-center gap-2 px-4 py-2">
@@ -41,4 +40,4 @@ export function BusinessInfo() {
       </div>
     </div>
   );
-} 
+}

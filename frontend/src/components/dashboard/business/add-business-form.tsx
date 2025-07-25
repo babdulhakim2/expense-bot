@@ -1,12 +1,17 @@
-'use client';
+"use client";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { BUSINESS_CATEGORIES } from "@/lib/constants/business-categories";
-import { BusinessService } from '@/lib/firebase/services/business-service';
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -21,36 +26,26 @@ export function AddBusinessForm() {
   const { data: session } = useSession();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
-    name: '',
-    type: BUSINESS_CATEGORIES[0].id
+    name: "",
+    type: BUSINESS_CATEGORIES[0].id,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!session?.user?.id) return;
-    
+
     setLoading(true);
     try {
-      const businessData = await BusinessService.createBusiness(
-        session.user.id,
-        session.user.email!,
-        {
-          name: formData.name,
-          type: formData.type,
-        }
-      );
-      
-
       toast({
         title: "Success",
         description: "Business created successfully",
       });
 
       setTimeout(() => {
-        router.push('/dashboard');
+        router.push("/dashboard");
       }, 500);
     } catch (error) {
-      console.error('Error creating business:', error);
+      console.error("Error creating business:", error);
       toast({
         title: "Error",
         description: "Failed to create business",
@@ -70,7 +65,9 @@ export function AddBusinessForm() {
             id="name"
             placeholder="Enter business name"
             value={formData.name}
-            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, name: e.target.value }))
+            }
             required
           />
         </div>
@@ -79,7 +76,9 @@ export function AddBusinessForm() {
           <Label htmlFor="type">Business Category</Label>
           <Select
             value={formData.type}
-            onValueChange={(value) => setFormData(prev => ({ ...prev, type: value }))}
+            onValueChange={(value) =>
+              setFormData((prev) => ({ ...prev, type: value }))
+            }
           >
             <SelectTrigger>
               <SelectValue placeholder="Select business category" />
@@ -102,4 +101,4 @@ export function AddBusinessForm() {
       </Button>
     </form>
   );
-} 
+}

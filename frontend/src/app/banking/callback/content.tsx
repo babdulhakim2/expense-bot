@@ -14,9 +14,8 @@ export function BankingCallbackContent() {
       const code = searchParams.get('code');
       const state = searchParams.get('state');
 
-      // Get stored connection state
-      const storedState = localStorage.getItem('bankConnectionState');
-      if (!storedState) {
+      // Parse state parameter (should contain encoded businessId and userId)
+      if (!state) {
         toast({
           title: "Error",
           description: "Invalid connection state",
@@ -26,7 +25,22 @@ export function BankingCallbackContent() {
         return;
       }
 
-      const { businessId, userId } = JSON.parse(storedState);
+      let businessId, userId;
+      try {
+        // Decode the state parameter (should be base64 encoded JSON)
+        const stateData = JSON.parse(atob(state));
+        businessId = stateData.businessId;
+        userId = stateData.userId;
+      } catch (error) {
+        console.error('Failed to parse state parameter:', error);
+        toast({
+          title: "Error",
+          description: "Invalid connection state format",
+          variant: "destructive",
+        });
+        router.push('/dashboard/settings');
+        return;
+      }
 
       try {
         const response = await fetch('/api/banking/callback', {
@@ -59,8 +73,6 @@ export function BankingCallbackContent() {
           variant: "destructive",
         });
       } finally {
-        // Clean up
-        localStorage.removeItem('bankConnectionState');
         // Redirect back to settings
         router.push('/dashboard/settings');
       }

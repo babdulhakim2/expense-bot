@@ -14,7 +14,7 @@ import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { BusinessInfo } from '../business/business-info';
+import { SmartBusinessSelector } from '../business/smart-business-selector';
 
 const navigationItems = [
   { name: 'Overview', href: '/dashboard', icon: HomeIcon },
@@ -32,7 +32,7 @@ export function SidebarNav() {
         <Link href='/' >
           <h2 className="text-xl font-bold mb-4">Expense Bot</h2>
         </Link>
-        <BusinessInfo />
+        <SmartBusinessSelector />
       </div>
       <nav className="flex-1 space-y-1 px-3">
         {navigationItems.map((item) => (
