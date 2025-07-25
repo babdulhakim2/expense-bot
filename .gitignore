@@ -1,12 +1,58 @@
+# =============================================================================
+# EXPENSE BOT - GIT IGNORE CONFIGURATION
+# =============================================================================
+
+# Environment files
+.env
+.env.local
+.env.*.local
+*.env
+.env.production
+*.production
+env_variables.yaml
+env_secrets.yaml
+.env.yaml
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# Dependencies
+node_modules/
+*/node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -19,26 +65,18 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-
-# Virtual Environment
+MANIFEST
 venv/
 env/
 ENV/
-.env
 .venv
 env.bak/
 venv.bak/
 
-# IDE specific files
-.idea/
-.vscode/
-*.swp
-*.swo
-.DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Firebase
+.firebase/
+.firebaserc
+emulator_data/
 
 # Testing
 .coverage
@@ -52,25 +90,37 @@ coverage.xml
 *.cover
 .hypothesis/
 .pytest_cache/
+coverage/
+*.lcov
+.nyc_output
 
-# Logs and databases
-*.log
+# Cache and temporary files
+.cache/
+.parcel-cache/
+.npm
+yarn.lock
+package-lock.json
+bun.lockb
+.eslintcache
+.tmp/
+tmp/
+temp/
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Databases
 *.sqlite
 *.db
 
-# Distribution / packaging
-.Python
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-*.dylib
-*.db
-env_variables.yaml
-env_secrets.yaml
-.env
-.env.yaml
+# Project specific
+start-dev.sh
+notebooks/.ipynb_checkpoints/
 
-.env.production
-*.production
+# OS generated files
+.Spotlight-V100
+.Trashes
+ehthumbs.db

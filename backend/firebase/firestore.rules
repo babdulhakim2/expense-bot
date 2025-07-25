@@ -6,32 +6,53 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isBusinessOwner(businessId) {
+      return isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+    }
+
     function isBusinessMember(businessId) {
       return isAuthenticated() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId;
+        (resource.data.userId == request.auth.uid ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId));
     }
 
     // Businesses collection
     match /businesses/{businessId} {
-      // Allow read if user is authenticated and is a member of the business
-      allow read: if isBusinessMember(businessId);
+      // Allow read if user is authenticated and owns the business
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // Allow list queries if user is authenticated (for getUserBusinesses)
+      allow list: if isAuthenticated();
       
       // Allow create if user is authenticated
       allow create: if isAuthenticated();
       
       // Allow update if user is authenticated and is the owner
       allow update: if isAuthenticated() && 
-        resource.data.ownerId == request.auth.uid;
+        resource.data.userId == request.auth.uid;
 
-      // Allow access to all subcollections for business members
+      // Allow access to all subcollections for business owners
       match /{subcollection}/{document=**} {
-        allow read: if isBusinessMember(businessId);
+        allow read, write: if isAuthenticated() && 
+          get(/databases/$(database)/documents/businesses/$(businessId)).data.userId == request.auth.uid;
       }
 
-      // Explicitly allow access to actions subcollection
+      // Explicitly allow access to actions, folders, spreadsheets subcollections
       match /actions/{actionId} {
-        allow read: if isBusinessMember(businessId);
+        allow read, write: if isAuthenticated() && 
+          get(/databases/$(database)/documents/businesses/$(businessId)).data.userId == request.auth.uid;
+      }
+      
+      match /folders/{folderId} {
+        allow read, write: if isAuthenticated() && 
+          get(/databases/$(database)/documents/businesses/$(businessId)).data.userId == request.auth.uid;
+      }
+      
+      match /spreadsheets/{spreadsheetId} {
+        allow read, write: if isAuthenticated() && 
+          get(/databases/$(database)/documents/businesses/$(businessId)).data.userId == request.auth.uid;
       }
     }
 
@@ -40,7 +61,7 @@ service cloud.firestore {
       // Allow users to read/write their own data
       allow read, write: if isAuthenticated() && userId == request.auth.uid;
       
-      // Allow querying users
+      // Allow querying users (for business member lookups)
       allow list: if isAuthenticated();
     }
   }
