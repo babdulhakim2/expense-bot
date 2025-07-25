@@ -3,7 +3,6 @@
 import { WhatsAppQR } from '@/components/shared/whatsapp-qr';
 import { cn } from "@/lib/utils";
 import {
-  FileSpreadsheetIcon,
   FolderIcon,
   HomeIcon,
   LogOutIcon,
@@ -80,7 +79,7 @@ export function SidebarNav() {
             <div className="text-center space-y-4">
               <h2 className="text-2xl font-bold text-gray-900">Connect with ExpenseBot</h2>
               <p className="text-gray-600">
-                Scan the QR code with your phone's camera or click below to open WhatsApp
+                Scan the QR code with your phone&apos;s camera or click below to open WhatsApp
               </p>
               <div className="flex justify-center">
                 <WhatsAppQR size={240} />

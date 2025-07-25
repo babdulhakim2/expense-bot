@@ -4,7 +4,6 @@ import { Building2Icon, ChevronDown, Plus, Check, Loader2 } from "lucide-react";
 import { useBusiness } from "@/app/providers/BusinessProvider";
 import { BUSINESS_CATEGORIES } from "@/lib/constants/business-categories";
 import { useState } from "react";
-import { useSession } from "next-auth/react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +13,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
 import { BusinessQuickCreateForm } from "./business-quick-create-form";
 

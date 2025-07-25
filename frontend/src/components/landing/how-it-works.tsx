@@ -191,7 +191,7 @@ export function HowItWorks() {
             Ready to Get Organized?
           </h3>
           <p className="text-muted-foreground mb-6">
-            Join thousands of users who've transformed their expense management
+            Join thousands of users who&apos;ve transformed their expense management
             with AI
           </p>
           <div className="flex flex-wrap gap-4 justify-center">

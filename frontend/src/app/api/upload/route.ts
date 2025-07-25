@@ -46,10 +46,10 @@ export async function POST(request: Request) {
     const data = await response.json();
     return NextResponse.json(data);
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Upload error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to process file' },
+      { error: (error && typeof error === 'object' && 'message' in error ? error.message : 'Failed to process file') as string },
       { status: 500 }
     );
   }

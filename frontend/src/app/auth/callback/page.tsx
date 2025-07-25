@@ -108,16 +108,18 @@ export default function AuthCallbackPage() {
         setTimeout(() => {
           router.push("/setup");
         }, 1500);
-      } catch (error: any) {
+      } catch (error) {
         console.error("Auth callback error:", error);
         let errorMessage = "Failed to complete sign-in";
 
-        if (error.code === "auth/invalid-email") {
-          errorMessage = "Invalid email address";
-        } else if (error.code === "auth/expired-action-code") {
-          errorMessage = "Sign-in link has expired";
-        } else if (error.code === "auth/invalid-action-code") {
-          errorMessage = "Invalid sign-in link";
+        if (error && typeof error === 'object' && 'code' in error) {
+          if (error.code === "auth/invalid-email") {
+            errorMessage = "Invalid email address";
+          } else if (error.code === "auth/expired-action-code") {
+            errorMessage = "Sign-in link has expired";
+          } else if (error.code === "auth/invalid-action-code") {
+            errorMessage = "Invalid sign-in link";
+          }
         }
 
         setError(errorMessage);

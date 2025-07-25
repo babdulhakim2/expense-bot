@@ -1,5 +1,7 @@
 "use client";
 
+import { useBusiness } from "@/app/providers/BusinessProvider";
+import { toast } from "@/hooks/use-toast";
 import { BusinessService } from "@/lib/firebase/services/business-service";
 import { subMonths } from "date-fns";
 import {
@@ -11,35 +13,32 @@ import {
   ReceiptIcon,
   UploadCloudIcon,
 } from "lucide-react";
-import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
 import { useDropzone } from "react-dropzone";
-import { ActivityFeed } from "./activity-feed";
-import { toast } from "@/hooks/use-toast";
-import { useBusiness } from "@/app/providers/BusinessProvider";
 import { NoBusinessFallback } from "../business/no-business-fallback";
+import { ActivityFeed } from "./activity-feed";
 
-interface Action {
+interface AIAction {
   id: string;
-  action_type: string;
-  status: string;
-  timestamp: string;
-  amount?: number;
+  type: string;
+  actionData: Record<string, unknown>;
+  createdAt: Date;
+  relatedId?: string;
+  businessId: string;
 }
 
 interface Stats {
   label: string;
   value: string | number;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   change: string;
   trend: "up" | "down" | "neutral";
   tooltip?: string;
 }
 
 export function DashboardOverview() {
-  const { data: session } = useSession();
   const { currentBusiness, hasBusinesses, isInitialized } = useBusiness();
-  const [actions, setActions] = useState<Action[]>([]);
+  const [actions, setActions] = useState<AIAction[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<Stats[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -51,8 +50,8 @@ export function DashboardOverview() {
           const actions = await BusinessService.getBusinessActions(
             currentBusiness.id
           );
-          setActions(actions as any);
-          calculateStats(actions as any);
+          setActions(actions);
+          calculateStats(actions);
         } else {
           // No business - show empty state
           setActions([]);
@@ -73,7 +72,7 @@ export function DashboardOverview() {
     }
   }, [currentBusiness, isInitialized]);
 
-  const calculateStats = (actions: Action[]) => {
+  const calculateStats = (actions: AIAction[]) => {
     const now = new Date();
     const lastMonth = subMonths(now, 1);
 
@@ -225,13 +224,13 @@ export function DashboardOverview() {
         const newActions = await BusinessService.getBusinessActions(
           currentBusiness.id
         );
-        setActions(newActions as any);
-        calculateStats(newActions as any);
-      } catch (error: any) {
+        setActions(newActions);
+        calculateStats(newActions);
+      } catch (error: unknown) {
         toast({
           variant: "destructive",
           title: "Error",
-          description: error.message || "Failed to process file",
+          description: (error && typeof error === 'object' && 'message' in error ? error.message : "Failed to process file") as string,
         });
       } finally {
         setUploading(false);

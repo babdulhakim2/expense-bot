@@ -6,18 +6,14 @@ import { BusinessService } from '@/lib/firebase/services/business-service';
 import { 
   FileSpreadsheetIcon, 
   FolderIcon, 
-  MoreVerticalIcon, 
   PlusIcon, 
   SearchIcon, 
-  ChevronRightIcon,
   CalendarIcon,
   ReceiptIcon,
-  FolderOpenIcon,
   ExternalLinkIcon,
   ArrowUpDownIcon
 } from "lucide-react";
 import { format } from 'date-fns';
-import { collection, getDocs } from 'firebase/firestore';
 
 interface FolderItem {
   id: string;
@@ -43,7 +39,6 @@ interface SpreadsheetItem {
 export default function FoldersPage() {
   const { data: session } = useSession();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [folders, setFolders] = useState<FolderItem[]>([]);
   const [spreadsheets, setSpreadsheets] = useState<SpreadsheetItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -70,12 +65,11 @@ export default function FoldersPage() {
             console.log('Business Actions:', actions);
             
             setFolders(folders);
-            setSpreadsheets(spreadsheets as any);
+            setSpreadsheets(spreadsheets);
           }
         }
       } catch (err) {
         console.error('Error loading business data:', err);
-        setError('Failed to load business data');
       } finally {
         setLoading(false);
       }
@@ -84,19 +78,6 @@ export default function FoldersPage() {
     loadBusinessData();
   }, [session]);
 
-  const organizedFolders = folders.reduce((acc, folder) => {
-    if (folder.type === 'business_root') {
-      if (!acc.root) acc.root = [];
-      acc.root.push(folder);
-    } else if (folder.type === 'receipt_root') {
-      if (!acc.receipts) acc.receipts = [];
-      acc.receipts.push(folder);
-    } else if (folder.type === 'transactions') {
-      if (!acc.transactions) acc.transactions = [];
-      acc.transactions.push(folder);
-    }
-    return acc;
-  }, {} as Record<string, FolderItem[]>);
 
   const filteredItems = [...folders, ...spreadsheets].filter(item => {
     if (searchTerm && !item.name.toLowerCase().includes(searchTerm.toLowerCase())) {
@@ -164,7 +145,7 @@ export default function FoldersPage() {
           </div>
           <select 
             value={filterType}
-            onChange={(e) => setFilterType(e.target.value as any)}
+            onChange={(e) => setFilterType(e.target.value)}
             className="px-3 py-2 bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All Items</option>

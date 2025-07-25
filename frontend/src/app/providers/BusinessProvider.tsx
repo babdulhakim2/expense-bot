@@ -162,7 +162,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoadingStates(prev => ({ ...prev, creating: false }));
     }
-  }, [session?.user?.id, session?.user?.email]);
+  }, [session?.user?.id, session?.user?.email, session?.user?.firestoreUserId]);
 
   const contextValue: BusinessContextType = {
     // State

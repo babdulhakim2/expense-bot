@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2Icon, Plus, ArrowRight } from "lucide-react";
+import { Building2Icon, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBusiness } from "@/app/providers/BusinessProvider";
 import { useState } from "react";

@@ -1,12 +1,10 @@
 "use client";
 
-import { motion } from 'framer-motion';
-import Image from 'next/image';
-import { TechLogos } from './tech-logos';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { ArrowRight } from 'lucide-react';
-import { useSession } from 'next-auth/react';
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { ArrowRight } from "lucide-react";
+import { useSession } from "next-auth/react";
 
 export function HeroSection() {
   const { data: session } = useSession();
@@ -32,8 +30,9 @@ export function HeroSection() {
           transition={{ delay: 0.4, duration: 0.5 }}
           className="text-base sm:text-lg text-muted-foreground max-w-2xl"
         >
-          Transform your messy financial documents into organized, categorized expenses. 
-          Simply connect two folders in your Google Drive - one for chaos, one for clarity.
+          Transform your messy financial documents into organized, categorized
+          expenses. Simply connect two folders in your Google Drive - one for
+          chaos, one for clarity.
         </motion.p>
 
         {/* Call to Action */}
@@ -72,7 +71,9 @@ export function HeroSection() {
               {/* Before - Messy Folder */}
               <div className="flex-1 text-center w-full">
                 <div className="bg-red-50 dark:bg-red-950/30 border-2 border-red-200 dark:border-red-800 rounded-lg p-4 sm:p-6 mb-3">
-                  <div className="text-red-600 dark:text-red-400 text-sm font-medium mb-2">📁 Messy Expenses</div>
+                  <div className="text-red-600 dark:text-red-400 text-sm font-medium mb-2">
+                    📁 Messy Expenses
+                  </div>
                   <div className="space-y-1 text-xs text-red-700 dark:text-red-300">
                     <div>receipt_pic_123.jpg</div>
                     <div>bank_statement_old.pdf</div>
@@ -80,7 +81,9 @@ export function HeroSection() {
                     <div>invoice_scan.jpeg</div>
                   </div>
                 </div>
-                <span className="text-sm text-muted-foreground">Your chaotic uploads</span>
+                <span className="text-sm text-muted-foreground">
+                  Your chaotic uploads
+                </span>
               </div>
 
               {/* Arrow */}
@@ -94,7 +97,9 @@ export function HeroSection() {
               {/* After - Organized Folder */}
               <div className="flex-1 text-center w-full">
                 <div className="bg-green-50 dark:bg-green-950/30 border-2 border-green-200 dark:border-green-800 rounded-lg p-4 sm:p-6 mb-3">
-                  <div className="text-green-600 dark:text-green-400 text-sm font-medium mb-2">📁 Organized Expenses</div>
+                  <div className="text-green-600 dark:text-green-400 text-sm font-medium mb-2">
+                    📁 Organized Expenses
+                  </div>
                   <div className="space-y-1 text-xs text-green-700 dark:text-green-300">
                     <div>📋 Office Supplies/</div>
                     <div>🍽️ Meals & Entertainment/</div>
@@ -102,10 +107,12 @@ export function HeroSection() {
                     <div>📊 Reports & Analytics/</div>
                   </div>
                 </div>
-                <span className="text-sm text-muted-foreground">Perfectly categorized</span>
+                <span className="text-sm text-muted-foreground">
+                  Perfectly categorized
+                </span>
               </div>
             </div>
-            
+
             {/* Mobile-friendly call to action */}
             <div className="mt-6 pt-6 border-t border-border/50 text-center">
               <p className="text-xs text-muted-foreground">
@@ -115,8 +122,6 @@ export function HeroSection() {
           </div>
         </motion.div>
       </div>
-
-      
     </div>
   );
-} 
+}

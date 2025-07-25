@@ -1,6 +1,15 @@
 "use client";
 
 import { BusinessService } from "@/lib/firebase/services/business-service";
+
+interface AIAction {
+  id: string;
+  type: string;
+  actionData: Record<string, unknown>;
+  createdAt: Date;
+  relatedId?: string;
+  businessId: string;
+}
 import { formatDistanceToNow } from "date-fns";
 import {
   AlertCircleIcon,
@@ -25,37 +34,15 @@ import {
   TableIcon,
   TagIcon,
 } from "lucide-react";
-import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useBusiness } from "@/app/providers/BusinessProvider";
 
-interface Action {
-  id: string;
-  action_type: string;
-  status: string;
-  timestamp: string;
-  type?: string;
-  content?: string;
-  document_url?: string;
-  document_type?: string;
-  url?: string;
-  name?: string;
-  amount?: number;
-  category?: string;
-  merchant?: string;
-  description?: string;
-  spreadsheet_url?: string;
-  month?: string;
-  year?: string;
-}
 
 export function ActivityFeed() {
-  const { data: session } = useSession();
   const { currentBusiness, hasBusinesses, isInitialized } = useBusiness();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [activities, setActivities] = useState<Action[]>([]);
+  const [activities, setActivities] = useState<AIAction[]>([]);
   const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
@@ -65,7 +52,7 @@ export function ActivityFeed() {
           const actions = await BusinessService.getBusinessActions(
             currentBusiness.id
           );
-          setActivities(actions as any);
+          setActivities(actions);
         } else {
           // No business - show empty state
           setActivities([]);

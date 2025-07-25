@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
 
 export type BankConnection = {
   id: string;
@@ -13,7 +12,6 @@ export type BankConnection = {
 
 export function useBankConnection() {
   const [isConnecting, setIsConnecting] = useState(false);
-  const { toast } = useToast();
 
   const connectBank = async (userId: string, businessId: string) => {
     try {
@@ -116,7 +114,7 @@ function loadPlaidLink(linkToken: string) {
     const script = document.createElement('script');
     script.src = 'https://cdn.plaid.com/link/v2/stable/link-initialize.js';
     script.onload = () => {
-      // @ts-ignore
+      // @ts-expect-error Plaid SDK is loaded dynamically and types are not available
       const handler = Plaid.create({
         token: linkToken,
         onSuccess: (public_token: string) => {
