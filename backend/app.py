@@ -14,7 +14,11 @@ import wandb
 from services.firebase_service import FirebaseService
 from twilio.rest import Client
 
-load_dotenv()  # take environment variables from .env.
+# Load .env file from mounted secrets or local file
+# if os.path.exists('/secrets/.env'):
+#     load_dotenv('/secrets/.env')
+# else:
+#     load_dotenv()  # take environment variables from .env.
 
 
 # Set up logging configuration at the top of the file after imports

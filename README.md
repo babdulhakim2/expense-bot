@@ -1,19 +1,17 @@
-# 🤖 ExpenseBot - AI-Powered Expense Management System
-
-<!-- [![CI/CD Pipeline](https://github.com/babdulhakim2/expense-bot/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/your-username/expense-bot/actions/workflows/ci-cd.yml) -->
+# 🚀 DriveBot - AI That Organizes Your Expenses in Google Drive
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 <div align="center">
   <img src="/frontend/public/Expense-bot.png" alt="ExpenseBot Process Flow" width="800"/>
-  <p><em>ExpenseBot's Receipt Processing Workflow</em></p>
+  <p><em>AI-powered expense organization in Google Drive</em></p>
 </div>
 
-A production-ready, AI-powered expense management system that processes receipts through WhatsApp using custom-trained vision models and enterprise-grade infrastructure.
+Give AI access to two Google Drive folders and watch it automatically organize your expenses. Send receipts via WhatsApp, and our custom-trained vision AI extracts data and sorts everything perfectly in Drive.
 
 ## 🏗️ System Overview
 
-ExpenseBot automates expense tracking by processing receipt images sent via WhatsApp, extracting structured data using custom PaliGemma models, and organizing expenses in Google Drive and Sheets.
+DriveBot automates expense tracking by processing receipt images sent via WhatsApp, extracting structured data using custom PaliGemma models, and organizing expenses in Google Drive and Sheets.
 
 ### Key Features
 

@@ -1,0 +1,202 @@
+name: ExpenseBot CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+env:
+  REGISTRY: expense-bot
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  BACKEND_IMAGE: backend
+
+jobs:
+  # Backend Testing and Building
+  backend-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Lint with flake8
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Format check with black
+        run: black --check --diff .
+
+      - name: Type check with mypy
+        run: mypy . --ignore-missing-imports
+
+      - name: Run tests with pytest
+        run: |
+          pytest --cov=. --cov-report=xml --cov-report=html --junitxml=junit.xml -v
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./backend/coverage.xml
+          flags: backend
+          name: backend-coverage
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: backend-test-results
+          path: |
+            backend/junit.xml
+            backend/htmlcov/
+
+  # Security Scanning
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: [backend-test]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "sarif"
+          output: "trivy-results.sarif"
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: "trivy-results.sarif"
+
+      - name: Run dependency check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: "expense-bot"
+          path: "."
+          format: "ALL"
+
+  # Docker Build and Push
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [backend-test, security-scan]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Configure Docker to use gcloud
+        run: gcloud auth configure-docker
+
+      - name: Build and push backend image
+        run: |
+          docker build -t $REGISTRY/$PROJECT_ID/$BACKEND_IMAGE:$GITHUB_SHA \
+                       -t $REGISTRY/$PROJECT_ID/$BACKEND_IMAGE:latest \
+                       ./backend
+          docker push $REGISTRY/$PROJECT_ID/$BACKEND_IMAGE:$GITHUB_SHA
+          docker push $REGISTRY/$PROJECT_ID/$BACKEND_IMAGE:latest
+
+  # Deploy to Production
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Deploy to Cloud Run (Production)
+        run: |
+          gcloud run deploy expense-bot-backend-prod \
+            --image $REGISTRY/$PROJECT_ID/$BACKEND_IMAGE:$GITHUB_SHA \
+            --platform managed \
+            --region us-central1 \
+            --allow-unauthenticated \
+            --set-env-vars="ENVIRONMENT=production" \
+            --max-instances=100 \
+            --cpu=2 \
+            --memory=2Gi
+
+      - name: Update traffic allocation
+        run: |
+          # Gradual rollout: 10% to new version
+          gcloud run services update-traffic expense-bot-backend-prod \
+            --to-revisions=LATEST=10
+
+      - name: Run smoke tests
+        run: |
+          # Wait for deployment
+          sleep 30
+
+          # Run smoke tests
+          cd backend
+          python -m pytest tests/smoke/ -v --prod-url=${{ steps.deploy.outputs.url }}
+
+      - name: Complete rollout if tests pass
+        run: |
+          gcloud run services update-traffic expense-bot-backend-prod \
+            --to-revisions=LATEST=100
+
+  # Notify on deployment
+  notify:
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: always()
+
+    # steps:
+    #   - name: Notify Slack
+    #     uses: 8398a7/action-slack@v3
+    #     with:
+    #       status: ${{ job.status }}
+    #       channel: "#deployments"
+    #       webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+    #     if: always()
