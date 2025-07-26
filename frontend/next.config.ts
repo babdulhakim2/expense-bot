@@ -7,7 +7,20 @@ const nextConfig: NextConfig = {
       ...config.resolve.alias,
       '@': path.resolve(__dirname, 'src'),
     };
+    
+    // Add fallback for Node.js modules that might be missing
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      path: false,
+      os: false,
+    };
+    
     return config;
+  },
+  // Ensure proper module resolution
+  experimental: {
+    externalDir: true,
   },
 };
 

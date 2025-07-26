@@ -2,9 +2,15 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs",
+  "installCommand": "npm install",
   "functions": {
     "app/api/**/*": {
       "maxDuration": 250
+    }
+  },
+  "build": {
+    "env": {
+      "NODE_OPTIONS": "--max_old_space_size=4096"
     }
   }
 }
