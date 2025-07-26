@@ -50,7 +50,6 @@ __pycache__/
 .pytest_cache/
 
 
-Receipt.v1i.paligemma
 
 .next
 *.log
