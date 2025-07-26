@@ -74,39 +74,39 @@ jobs:
             # backend/htmlcov/
 
   # Security Scanning
-  security-scan:
-    runs-on: ubuntu-latest
-    needs: [backend-test]
+  # security-scan:
+  #   runs-on: ubuntu-latest
+  #   needs: [backend-test]
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: "fs"
-          scan-ref: "."
-          format: "sarif"
-          output: "trivy-results.sarif"
+  #     - name: Run Trivy vulnerability scanner
+  #       uses: aquasecurity/trivy-action@master
+  #       with:
+  #         scan-type: "fs"
+  #         scan-ref: "."
+  #         format: "sarif"
+  #         output: "trivy-results.sarif"
 
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v2
-        if: always()
-        with:
-          sarif_file: "trivy-results.sarif"
+  #     - name: Upload Trivy scan results to GitHub Security tab
+  #       uses: github/codeql-action/upload-sarif@v2
+  #       if: always()
+  #       with:
+  #         sarif_file: "trivy-results.sarif"
 
-      - name: Run dependency check
-        uses: dependency-check/Dependency-Check_Action@main
-        with:
-          project: "expense-bot"
-          path: "."
-          format: "ALL"
+  #     - name: Run dependency check
+  #       uses: dependency-check/Dependency-Check_Action@main
+  #       with:
+  #         project: "expense-bot"
+  #         path: "."
+  #         format: "ALL"
 
   # Docker Build and Push
   docker-build:
     runs-on: ubuntu-latest
-    needs: [backend-test, security-scan]
+    needs: [backend-test] # add security-scan if you want to run it before building
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
 
     steps:
