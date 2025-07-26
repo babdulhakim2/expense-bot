@@ -4,9 +4,7 @@ FROM python:3.12-slim
 # Set working directory
 WORKDIR /app
 
-# Add build arg for env file
-ARG ENV_FILE=.env
-ENV ENV_FILE=${ENV_FILE}
+# No need for .env file - using Cloud Run secrets
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -20,9 +18,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application
 COPY . .
-
-# Copy the specified env file to .env
-COPY ${ENV_FILE} .env
 
 # Set environment variable for Flask
 ENV FLASK_APP=app.py
