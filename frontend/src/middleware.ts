@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 
+// For NextAuth v4, we need to use a different approach
+// Since getToken might not be available, we'll check the session cookie
 export async function middleware(request: NextRequest) {
-  const token = await getToken({ req: request });
+  const sessionCookie = request.cookies.get('next-auth.session-token') || 
+                       request.cookies.get('__Secure-next-auth.session-token');
 
-  if (!token) {
+  if (!sessionCookie) {
     return NextResponse.redirect(new URL('/auth/signin', request.url));
   }
 
