@@ -1,8 +1,8 @@
 "use client";
 
 import { Suspense } from "react";
-import { auth } from "../../../lib/firebase/firebase-config";
-import { UserService } from "../../../lib/firebase/services/user-service";
+import { auth } from "@/lib/firebase/firebase-config";
+import { UserService } from "@/lib/firebase/services/user-service";
 import {
   getRedirectResult,
   isSignInWithEmailLink,
