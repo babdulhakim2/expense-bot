@@ -15,6 +15,9 @@ from .google_drive_service import GoogleDriveService
 import mimetypes
 import ssl
 
+# Set up logger
+logger = logging.getLogger(__name__)
+
 # Google Sheets and Drive setup
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -39,10 +42,6 @@ except Exception as e:
 
 sheets_client = gspread.authorize(creds)
 drive_service = build('drive', 'v3', credentials=creds)
-
-
-
-logger = logging.getLogger(__name__)
 
 class FirebaseService:
     def __init__(self):
