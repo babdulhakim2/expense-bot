@@ -18,8 +18,8 @@ bandit==1.7.5
 safety==2.3.4
 
 # Documentation
-sphinx==7.0.1
-sphinx-rtd-theme==1.2.2
+sphinx>=6.0,<7.0
+sphinx-rtd-theme>=1.2.0
 
 # Jupyter (for notebooks)
 jupyter==1.0.0
