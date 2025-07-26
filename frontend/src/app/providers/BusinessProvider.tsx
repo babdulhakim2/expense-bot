@@ -1,6 +1,6 @@
 'use client';
 
-import { BusinessService, type Business } from '../../lib/firebase/services/business-service';
+import { BusinessService, type Business } from '@/lib/firebase/services/business-service';
 // import { UserService } from '@/lib/firebase/services/user-service';
 import { useSession } from 'next-auth/react';
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { BusinessService } from '../../../lib/firebase/services/business-service';
+import { BusinessService } from '@/lib/firebase/services/business-service';
 import { 
   FileSpreadsheetIcon, 
   FolderIcon, 

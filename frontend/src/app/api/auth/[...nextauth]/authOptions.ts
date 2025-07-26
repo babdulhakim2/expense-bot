@@ -1,7 +1,7 @@
 import { DecodedIdToken } from "firebase-admin/auth";
 import { User } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { adminAuth } from "../../../../lib/firebase/firebase-admin";
+import { adminAuth } from "@/lib/firebase/firebase-admin";
 
 
 
