@@ -4,6 +4,14 @@ import logging
 from dotenv import load_dotenv
 
 load_dotenv()
+# 
+
+# Load .env file from mounted secrets or local file
+if os.path.exists('/secrets/.env'):
+    load_dotenv('/secrets/.env')
+else:
+    load_dotenv()  # take environment variables from .env.
+
 logger = logging.getLogger(__name__)
 
 class Config:
