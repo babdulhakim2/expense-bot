@@ -51,7 +51,7 @@ export function PoweredBySection() {
         </div>
         
         <p className="text-sm text-muted-foreground max-w-md text-center">
-          Leveraging Google's Open weights models for intelligent receipt processing and analysis
+          Leveraging Google&apos;s Open weights models for intelligent receipt processing and analysis
         </p>
       </div>
     </motion.div>

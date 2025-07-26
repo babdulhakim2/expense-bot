@@ -1,4 +1,3 @@
-// app/providers.js
 "use client";
 import posthog from 'posthog-js';
 import { PostHogProvider } from 'posthog-js/react';
@@ -9,14 +8,22 @@ interface CSPostHogProviderProps {
   children: React.ReactNode;
 }
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
   posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
     api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
     capture_pageview: true,
     capture_pageleave: true,
-    // session_recording: {
-    //   enabled: true,
-    // },
+    
+  });
+} else if (typeof window !== 'undefined') {
+  // Initialize PostHog with minimal config in development
+  posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
+    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+    capture_pageview: false,
+    capture_pageleave: false,
+
+    autocapture: false,
+    disable_session_recording: true,
   });
 }
 
@@ -24,13 +31,13 @@ export function CSPostHogProvider({ children }: CSPostHogProviderProps) {
   const { data: session } = useSession();
 
   useEffect(() => {
-    // Identify user when the session changes
-    if (session?.user) {
-      posthog.identify(session.user.id, {
+    // Only identify users in production
+    if (process.env.NODE_ENV === 'production' && session?.user) {
+      posthog.identify((session.user as any).id, { // eslint-disable-line @typescript-eslint/no-explicit-any
         email: session.user.email,
         name: session.user.name,
       });
-    } else {
+    } else if (process.env.NODE_ENV === 'production') {
       // Reset user identification if logged out
       posthog.reset();
     }

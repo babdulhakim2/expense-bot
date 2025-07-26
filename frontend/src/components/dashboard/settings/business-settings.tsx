@@ -79,7 +79,7 @@ export function BusinessSettings() {
     };
     
     fetchData();
-  }, [session]);
+  }, [session, toast]);
 
   // Add a debug effect to monitor business state changes
   useEffect(() => {

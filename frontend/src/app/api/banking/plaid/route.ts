@@ -44,12 +44,12 @@ export async function POST(req: Request) {
 
     return NextResponse.json(result);
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Plaid API error:', error);
     return NextResponse.json(
       { 
-        error: error.message || 'Failed to process request',
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        error: (error && typeof error === 'object' && 'message' in error ? error.message : 'Failed to process request') as string,
+        details: process.env.NODE_ENV === 'development' && error && typeof error === 'object' && 'stack' in error ? error.stack : undefined
       },
       { status: 500 }
     );

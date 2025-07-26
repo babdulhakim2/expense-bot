@@ -10,7 +10,8 @@
       "rules": "storage.rules"
     },
     "auth": {
-      "port": 9099
+      "port": 9099,
+      "host": "localhost"
     },
     "ui": {
       "enabled": true

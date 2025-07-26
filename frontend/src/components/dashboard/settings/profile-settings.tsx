@@ -1,6 +1,5 @@
 'use client';
 
-import { UserIcon, PhoneIcon, AtSignIcon, ShieldIcon } from "lucide-react";
 import { useState, useEffect } from 'react';
 import { useSession } from "next-auth/react";
 import { UserService, type User } from '@/lib/firebase/services/user-service';
@@ -58,7 +57,7 @@ export function ProfileSettings() {
     };
 
     fetchUser();
-  }, [session]);
+  }, [session, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

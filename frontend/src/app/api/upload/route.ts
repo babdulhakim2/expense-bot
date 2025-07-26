@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 
 export const maxDuration = 250; 
 export const dynamic = 'force-dynamic';
@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 const FLASK_API_URL = process.env.NEXT_PUBLIC_FLASK_API_URL;
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
+  const session = await getServerSession(authOptions) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   if (!session?.user) {
     return NextResponse.json(
@@ -46,10 +46,10 @@ export async function POST(request: Request) {
     const data = await response.json();
     return NextResponse.json(data);
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Upload error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to process file' },
+      { error: (error && typeof error === 'object' && 'message' in error ? error.message : 'Failed to process file') as string },
       { status: 500 }
     );
   }

@@ -1,7 +1,7 @@
 // 'use client';
 
 import Link from "next/link";
-import { FileQuestionIcon, HomeIcon, ArrowLeftIcon } from "lucide-react";
+import { FileQuestionIcon, HomeIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function NotFound() {
@@ -20,7 +20,7 @@ export default function NotFound() {
         <div className="space-y-2">
           <h1 className="text-4xl font-bold text-gray-900">Page Not Found</h1>
           <p className="text-gray-600">
-            Oops! It seems the financial document you're looking for doesn't exist or has been moved.
+            Oops! It seems the financial document you&apos;re looking for doesn&apos;t exist or has been moved.
           </p>
         </div>
 

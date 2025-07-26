@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
-import { WHATSAPP_CONFIG } from '@/lib/config/whatsapp';
+import { WHATSAPP_CONFIG } from '@/lib/whatsapp.config';
 import { MessageCircle } from "lucide-react";
 import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useState } from 'react';

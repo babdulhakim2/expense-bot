@@ -3,7 +3,6 @@
 import { WhatsAppQR } from '@/components/shared/whatsapp-qr';
 import { cn } from "@/lib/utils";
 import {
-  FileSpreadsheetIcon,
   FolderIcon,
   HomeIcon,
   LogOutIcon,
@@ -14,7 +13,7 @@ import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { BusinessInfo } from '../business/business-info';
+import { SmartBusinessSelector } from '../business/smart-business-selector';
 
 const navigationItems = [
   { name: 'Overview', href: '/dashboard', icon: HomeIcon },
@@ -32,7 +31,7 @@ export function SidebarNav() {
         <Link href='/' >
           <h2 className="text-xl font-bold mb-4">Expense Bot</h2>
         </Link>
-        <BusinessInfo />
+        <SmartBusinessSelector />
       </div>
       <nav className="flex-1 space-y-1 px-3">
         {navigationItems.map((item) => (
@@ -80,7 +79,7 @@ export function SidebarNav() {
             <div className="text-center space-y-4">
               <h2 className="text-2xl font-bold text-gray-900">Connect with ExpenseBot</h2>
               <p className="text-gray-600">
-                Scan the QR code with your phone's camera or click below to open WhatsApp
+                Scan the QR code with your phone&apos;s camera or click below to open WhatsApp
               </p>
               <div className="flex justify-center">
                 <WhatsAppQR size={240} />
