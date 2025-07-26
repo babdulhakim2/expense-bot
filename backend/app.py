@@ -39,6 +39,19 @@ firebase_service = FirebaseService()
 # Initialize Twilio client
 twilio_client = Client(Config.TWILIO_ACCOUNT_SID, Config.TWILIO_AUTH_TOKEN)
 
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """
+    Health check endpoint to verify if the server is running.
+    """
+    return jsonify({'status': 'ok', 'timestamp': datetime.now().isoformat()}), 200
+
+
+
+
+
+
 @app.route('/whatsapp', methods=['POST'])
 def whatsapp():
     try:
