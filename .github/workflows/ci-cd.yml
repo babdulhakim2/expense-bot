@@ -7,8 +7,9 @@ on:
     branches: [main, dev]
 
 env:
-  REGISTRY: expense-bot
+  REGISTRY: us-central1-docker.pkg.dev
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REPOSITORY: expense-bot
   BACKEND_IMAGE: backend
 
 jobs:
@@ -124,15 +125,15 @@ jobs:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Configure Docker to use gcloud
-        run: gcloud auth configure-docker
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev
 
       - name: Build and push backend image
         run: |
-          docker build -t $REGISTRY/$PROJECT_ID/$BACKEND_IMAGE:$GITHUB_SHA \
-                       -t $REGISTRY/$PROJECT_ID/$BACKEND_IMAGE:latest \
+          docker build -t $REGISTRY/$PROJECT_ID/$REPOSITORY/$BACKEND_IMAGE:$GITHUB_SHA \
+                       -t $REGISTRY/$PROJECT_ID/$REPOSITORY/$BACKEND_IMAGE:latest \
                        ./backend
-          docker push $REGISTRY/$PROJECT_ID/$BACKEND_IMAGE:$GITHUB_SHA
-          docker push $REGISTRY/$PROJECT_ID/$BACKEND_IMAGE:latest
+          docker push $REGISTRY/$PROJECT_ID/$REPOSITORY/$BACKEND_IMAGE:$GITHUB_SHA
+          docker push $REGISTRY/$PROJECT_ID/$REPOSITORY/$BACKEND_IMAGE:latest
 
   # Deploy to Production
   deploy-production:
