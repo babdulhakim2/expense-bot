@@ -192,11 +192,6 @@ jobs:
     needs: [deploy-production]
     if: always()
 
-    # steps:
-    #   - name: Notify Slack
-    #     uses: 8398a7/action-slack@v3
-    #     with:
-    #       status: ${{ job.status }}
-    #       channel: "#deployments"
-    #       webhook_url: ${{ secrets.SLACK_WEBHOOK }}
-    #     if: always()
+    steps:
+      - name: Deployment notification
+        run: echo "Deployment completed with status ${{ needs.deploy-production.result }}"
