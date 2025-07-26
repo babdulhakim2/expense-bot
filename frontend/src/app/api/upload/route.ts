@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
+import { authOptions } from "../auth/[...nextauth]/authOptions";
 
 export const maxDuration = 250; 
 export const dynamic = 'force-dynamic';
@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 const FLASK_API_URL = process.env.NEXT_PUBLIC_FLASK_API_URL;
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const session = await getServerSession(authOptions) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   if (!session?.user) {
     return NextResponse.json(

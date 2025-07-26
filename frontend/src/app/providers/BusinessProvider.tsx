@@ -1,6 +1,6 @@
 'use client';
 
-import { BusinessService, type Business } from '@/lib/firebase/services/business-service';
+import { BusinessService, type Business } from '../../lib/firebase/services/business-service';
 // import { UserService } from '@/lib/firebase/services/user-service';
 import { useSession } from 'next-auth/react';
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
@@ -57,7 +57,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
       setLoadingStates(prev => ({ ...prev, loading: true }));
       
       // Try to get all businesses for this user
-      const userBusinesses = await BusinessService.getUserBusinesses(session.user.id);
+      const userBusinesses = await BusinessService.getUserBusinesses((session.user as any).id); // eslint-disable-line @typescript-eslint/no-explicit-any
       setBusinesses(userBusinesses);
       
       // If we have businesses but no current business, select the first one
@@ -85,7 +85,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
       setLoadingStates(prev => ({ ...prev, loading: false }));
       setIsInitialized(true);
     }
-  }, [session?.user?.email, session?.user?.id, currentBusiness]);
+  }, [session?.user?.email, (session?.user as any)?.id, currentBusiness]); // eslint-disable-line @typescript-eslint/no-explicit-any
 
   // Initial load
   useEffect(() => {
@@ -114,23 +114,23 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
   }, [loadBusinesses]);
 
   const getUserBusinesses = useCallback(async (): Promise<Business[]> => {
-    if (!session?.user?.id) return [];
+    if (!(session?.user as any)?.id) return []; // eslint-disable-line @typescript-eslint/no-explicit-any
     try {
       // Use the Firestore user ID (which is same as Firebase Auth UID for consistency)
-      const firestoreUserId = session.user.firestoreUserId || session.user.id;
+      const firestoreUserId = (session?.user as any)?.firestoreUserId || (session?.user as any)?.id; // eslint-disable-line @typescript-eslint/no-explicit-any
       return await BusinessService.getUserBusinesses(firestoreUserId);
     } catch (error) {
       console.error('Failed to get user businesses:', error);
       return [];
     }
-  }, [session?.user?.id, session?.user?.firestoreUserId]);
+  }, [(session?.user as any)?.id, (session?.user as any)?.firestoreUserId]); // eslint-disable-line @typescript-eslint/no-explicit-any
 
   const createAndSelectBusiness = useCallback(async (data: { 
     name: string; 
     type: string; 
     location?: string 
   }): Promise<Business> => {
-    if (!session?.user?.id || !session?.user?.email) {
+    if (!(session?.user as any)?.id || !session?.user?.email) { // eslint-disable-line @typescript-eslint/no-explicit-any
       throw new Error('User session required');
     }
 
@@ -138,7 +138,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
       setLoadingStates(prev => ({ ...prev, creating: true }));
       
       // Use the Firestore user ID (which is same as Firebase Auth UID for consistency)
-      const firestoreUserId = session.user.firestoreUserId || session.user.id;
+      const firestoreUserId = (session.user as any).firestoreUserId || (session.user as any).id; // eslint-disable-line @typescript-eslint/no-explicit-any
       
       // Create the business
       const newBusiness = await BusinessService.createBusiness({
@@ -162,7 +162,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoadingStates(prev => ({ ...prev, creating: false }));
     }
-  }, [session?.user?.id, session?.user?.email, session?.user?.firestoreUserId]);
+  }, [(session?.user as any)?.id, session?.user?.email, (session?.user as any)?.firestoreUserId]); // eslint-disable-line @typescript-eslint/no-explicit-any
 
   const contextValue: BusinessContextType = {
     // State

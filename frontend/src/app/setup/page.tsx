@@ -52,7 +52,7 @@ export default function SetupPage() {
 
   useEffect(() => {
     async function loadUserBusinesses() {
-      if (!session?.user?.id || !isInitialized) return;
+      if (!(session?.user as any)?.id || !isInitialized) return; // eslint-disable-line @typescript-eslint/no-explicit-any
 
       try {
         const userBiz = await getUserBusinesses();
@@ -70,7 +70,7 @@ export default function SetupPage() {
 
     loadUserBusinesses();
   }, [
-    session?.user?.id,
+    (session?.user as any)?.id, // eslint-disable-line @typescript-eslint/no-explicit-any
     isInitialized,
     currentBusiness,
     getUserBusinesses,

@@ -17,7 +17,7 @@ export default function Home() {
   useEffect(() => {
     // Identify user when they're logged in
     if (session?.user) {
-      posthog.identify(session.user.id, {
+      posthog.identify((session.user as any).id, { // eslint-disable-line @typescript-eslint/no-explicit-any
         email: session.user.email,
         name: session.user.name,
       });

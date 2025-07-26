@@ -9,6 +9,21 @@ interface AIAction {
   createdAt: Date;
   relatedId?: string;
   businessId: string;
+  message?: string;
+  action_type?: string;
+  status: "completed" | "processing" | "failed";
+  document_type?: string;
+  merchant?: string;
+  amount?: number;
+  // Additional properties used in the component
+  month?: string;
+  year?: string;
+  name?: string;
+  content?: string;
+  document_url?: string;
+  category?: string;
+  description?: string;
+  timestamp?: string | Date;
 }
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -38,7 +53,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useBusiness } from "@/app/providers/BusinessProvider";
 
-
 export function ActivityFeed() {
   const { currentBusiness, hasBusinesses, isInitialized } = useBusiness();
   const [loading, setLoading] = useState(true);
@@ -52,7 +66,7 @@ export function ActivityFeed() {
           const actions = await BusinessService.getBusinessActions(
             currentBusiness.id
           );
-          setActivities(actions);
+          setActivities(actions as AIAction[]);
         } else {
           // No business - show empty state
           setActivities([]);
@@ -61,7 +75,6 @@ export function ActivityFeed() {
         console.error("Error loading activities:", err);
         // On Firebase error, fallback to empty activities instead of showing error
         setActivities([]);
-        setError(null); // Don't show error to user
       } finally {
         setLoading(false);
       }
@@ -72,7 +85,7 @@ export function ActivityFeed() {
     }
   }, [currentBusiness, isInitialized]);
 
-  const getActionIcon = (action: Action) => {
+  const getActionIcon = (action: AIAction) => {
     const baseClass = "h-5 w-5";
     const statusColors: { [key: string]: string } = {
       completed: "text-green-600",
@@ -104,7 +117,7 @@ export function ActivityFeed() {
     }
   };
 
-  const getActionTitle = (action: Action) => {
+  const getActionTitle = (action: AIAction) => {
     switch (action.action_type) {
       case "message_received":
         return "Message received";
@@ -123,11 +136,11 @@ export function ActivityFeed() {
           action.merchant ? ` for ${action.merchant}` : ""
         }`;
       default:
-        return action.action_type.replace(/_/g, " ");
+        return action.action_type?.replace(/_/g, " ") || "Unknown action";
     }
   };
 
-  const getActionDetails = (action: Action) => {
+  const getActionDetails = (action: AIAction) => {
     switch (action.action_type) {
       case "message_received":
       case "message_sent":
@@ -411,9 +424,12 @@ export function ActivityFeed() {
                     </div>
                     <div className="mt-1">{getActionDetails(activity)}</div>
                     <p className="text-xs text-gray-400 mt-2">
-                      {formatDistanceToNow(new Date(activity.timestamp), {
-                        addSuffix: true,
-                      })}
+                      {formatDistanceToNow(
+                        new Date(activity.timestamp || activity.createdAt),
+                        {
+                          addSuffix: true,
+                        }
+                      )}
                     </p>
                   </div>
                 </div>

@@ -1,7 +1,8 @@
 "use client";
 
-import { auth } from "@/lib/firebase/firebase-config";
-import { UserService } from "@/lib/firebase/services/user-service";
+import { Suspense } from "react";
+import { auth } from "../../../lib/firebase/firebase-config";
+import { UserService } from "../../../lib/firebase/services/user-service";
 import {
   getRedirectResult,
   isSignInWithEmailLink,
@@ -12,7 +13,7 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -195,4 +196,28 @@ export default function AuthCallbackPage() {
   }
 
   return null;
+}
+
+// Loading fallback component
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center space-y-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
+        <div className="space-y-2">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Loading...
+          </h2>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <AuthCallbackContent />
+    </Suspense>
+  );
 }

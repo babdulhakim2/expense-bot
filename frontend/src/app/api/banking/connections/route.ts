@@ -1,11 +1,11 @@
-import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
+import { authOptions } from "../../auth/[...nextauth]/authOptions";
 import { getServerSession } from "next-auth/next";
 import { NextResponse } from "next/server";
 
 const FLASK_API_URL = process.env.NEXT_PUBLIC_FLASK_API_URL;
 
 export async function GET(request: Request) {
-  const session = await getServerSession(authOptions as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const session = await getServerSession(authOptions) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
   const { searchParams } = new URL(request.url);
   const businessId = searchParams.get("businessId");
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { BusinessService } from '@/lib/firebase/services/business-service';
+import { BusinessService } from '../../../lib/firebase/services/business-service';
 import { 
   FileSpreadsheetIcon, 
   FolderIcon, 
@@ -29,7 +29,9 @@ interface SpreadsheetItem {
   id: string;
   name: string;
   url: string;
-  drive_spreadsheet_id: string;
+  drive_id: string;
+  type: string;
+  businessId: string;
   month: string;
   year: string;
   createdAt: Date;
@@ -83,10 +85,10 @@ export default function FoldersPage() {
     if (searchTerm && !item.name.toLowerCase().includes(searchTerm.toLowerCase())) {
       return false;
     }
-    if (filterType === 'folders' && 'drive_spreadsheet_id' in item) {
+    if (filterType === 'folders' && 'drive_id' in item) {
       return false;
     }
-    if (filterType === 'spreadsheets' && !('drive_spreadsheet_id' in item)) {
+    if (filterType === 'spreadsheets' && !('drive_id' in item)) {
       return false;
     }
     return true;
@@ -145,7 +147,7 @@ export default function FoldersPage() {
           </div>
           <select 
             value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
+            onChange={(e) => setFilterType(e.target.value as 'all' | 'folders' | 'spreadsheets')}
             className="px-3 py-2 bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All Items</option>
@@ -157,7 +159,7 @@ export default function FoldersPage() {
         {/* Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {sortedItems.map((item) => {
-            const isSpreadsheet = 'drive_spreadsheet_id' in item;
+            const isSpreadsheet = 'drive_id' in item;
             
             return (
               <a

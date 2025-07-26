@@ -1,27 +1,9 @@
 import { DecodedIdToken } from "firebase-admin/auth";
-import { NextAuthOptions, User } from "next-auth";
+import { User } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { adminAuth } from "../../../../lib/firebase/firebase-admin";
 
-declare module "next-auth" {
-  interface Session {
-    user: {
-      id: string;
-      name?: string | null;
-      phoneNumber?: string | null;
-      idToken?: string;
-      email?: string | null;
-      firestoreUserId?: string;
-    };
-  }
 
-  interface User {
-    id: string;
-    phoneNumber?: string | null;
-    idToken?: string;
-    firestoreUserId?: string;
-  }
-}
 
 const verifyToken = async (token: string): Promise<DecodedIdToken | null> => {
   if (process.env.NODE_ENV === "development") {
@@ -47,14 +29,14 @@ const verifyToken = async (token: string): Promise<DecodedIdToken | null> => {
   }
 };
 
-export const authOptions: NextAuthOptions = {
+const authConfig = {
   providers: [
     CredentialsProvider({
       credentials: {
         email: { label: "Email", type: "email" },
         signInLink: { label: "Sign In Link", type: "text" },
       },
-      async authorize(credentials: any): Promise<User | null> {
+      async authorize(credentials: any): Promise<User | null> { // eslint-disable-line @typescript-eslint/no-explicit-any
         if (!credentials?.token) {
           return null;
         }
@@ -71,18 +53,18 @@ export const authOptions: NextAuthOptions = {
             idToken: credentials.token,
             firestoreUserId: decodedToken.user_id,
           };
-        } catch (error) {
+        } catch {
           return null;
         }
       },
     }),
   ],
   session: {
-    strategy: "jwt",
+    strategy: "jwt" as const,
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: { token: any; user?: User }) { // eslint-disable-line @typescript-eslint/no-explicit-any
       if (user) {
         token.id = user.id;
         token.email = user.email || null;
@@ -91,7 +73,7 @@ export const authOptions: NextAuthOptions = {
       }
       return token;
     },
-    async session({ session, token }) {
+    async session({ session, token }: { session: any; token: any }) { // eslint-disable-line @typescript-eslint/no-explicit-any
       if (session?.user) {
         session.user.id = token.id as string;
         session.user.email = token.email as string | null;
@@ -107,3 +89,5 @@ export const authOptions: NextAuthOptions = {
   },
   debug: process.env.NODE_ENV === "development",
 };
+
+export const authOptions = authConfig as any; // eslint-disable-line @typescript-eslint/no-explicit-any

@@ -25,6 +25,9 @@ interface AIAction {
   createdAt: Date;
   relatedId?: string;
   businessId: string;
+  timestamp?: string | Date;
+  action_type?: string;
+  amount?: number;
 }
 
 interface Stats {
@@ -78,14 +81,14 @@ export function DashboardOverview() {
 
     // Current month's actions
     const currentMonthActions = actions.filter(
-      (a) => new Date(a.timestamp) >= lastMonth
+      (a) => new Date(a.timestamp ?? a.createdAt) >= lastMonth
     );
 
     // Previous month's actions for comparison
     const previousMonthActions = actions.filter(
       (a) =>
-        new Date(a.timestamp) >= subMonths(lastMonth, 1) &&
-        new Date(a.timestamp) < lastMonth
+        new Date(a.timestamp ?? a.createdAt) >= subMonths(lastMonth, 1) &&
+        new Date(a.timestamp ?? a.createdAt) < lastMonth
     );
 
     const calculateChange = (current: number, previous: number) => {
@@ -230,7 +233,9 @@ export function DashboardOverview() {
         toast({
           variant: "destructive",
           title: "Error",
-          description: (error && typeof error === 'object' && 'message' in error ? error.message : "Failed to process file") as string,
+          description: (error && typeof error === "object" && "message" in error
+            ? error.message
+            : "Failed to process file") as string,
         });
       } finally {
         setUploading(false);

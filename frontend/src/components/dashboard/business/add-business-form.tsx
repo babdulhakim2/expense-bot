@@ -32,7 +32,7 @@ export function AddBusinessForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!session?.user?.id) return;
+    if (!(session?.user as any)?.id) return; // eslint-disable-line @typescript-eslint/no-explicit-any
 
     setLoading(true);
     try {
