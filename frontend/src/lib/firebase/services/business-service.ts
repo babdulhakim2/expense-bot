@@ -11,6 +11,18 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/firebase-config";
 
+export type GoogleDriveConfig = {
+  accessToken?: string;
+  refreshToken?: string;
+  scope?: string[];
+  inputFolderPath?: string;
+  outputFolderPath?: string;
+  inputFolderId?: string;
+  outputFolderId?: string;
+  connectedAt?: Date;
+  email?: string;
+};
+
 export type Business = {
   id: string;
   name: string;
@@ -22,6 +34,7 @@ export type Business = {
   updatedAt: Date;
   userId: string;
   primaryEmail: string;
+  googleDrive?: GoogleDriveConfig;
 };
 
 export type BusinessUser = {
@@ -386,6 +399,38 @@ export class BusinessService {
       });
     } catch (error) {
       console.error("Error fetching business transactions:", error);
+      throw error;
+    }
+  }
+
+  static async updateGoogleDriveConfig(
+    businessId: string,
+    config: GoogleDriveConfig
+  ): Promise<void> {
+    try {
+      const businessRef = doc(db, "businesses", businessId);
+      await updateDoc(businessRef, {
+        googleDrive: {
+          ...config,
+          connectedAt: config.connectedAt || new Date(),
+        },
+        updatedAt: new Date(),
+      });
+    } catch (error) {
+      console.error("Error updating Google Drive config:", error);
+      throw error;
+    }
+  }
+
+  static async removeGoogleDriveConfig(businessId: string): Promise<void> {
+    try {
+      const businessRef = doc(db, "businesses", businessId);
+      await updateDoc(businessRef, {
+        googleDrive: null,
+        updatedAt: new Date(),
+      });
+    } catch (error) {
+      console.error("Error removing Google Drive config:", error);
       throw error;
     }
   }

@@ -12,12 +12,13 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { BUSINESS_CATEGORIES } from "@/lib/constants/business-categories";
-import { Business } from "@/lib/firebase/services/business-service";
+import { Business, GoogleDriveConfig } from "@/lib/firebase/services/business-service";
 import { ArrowRight, Building, CheckCircle, Loader2, Plus } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
+import { GoogleDriveSetup } from "@/components/setup/google-drive-setup";
 
 interface NewBusinessData {
   name: string;
@@ -39,6 +40,8 @@ export default function SetupPage() {
 
   const [userBusinesses, setUserBusinesses] = useState<Business[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showGoogleDriveSetup, setShowGoogleDriveSetup] = useState(false);
+  const [selectedBusinessForGDrive, setSelectedBusinessForGDrive] = useState<Business | null>(null);
   const [newBusinessData, setNewBusinessData] = useState<NewBusinessData>({
     name: "",
     type: "",
@@ -50,6 +53,20 @@ export default function SetupPage() {
       router.push("/");
     }
   }, [status, router]);
+
+  // Check for Google Drive connection success
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('google_drive') === 'connected') {
+      toast({
+        title: "Google Drive Connected!",
+        description: "Your Google Drive is now connected to your business.",
+      });
+      // Remove the query parameter from URL
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []);
 
   useEffect(() => {
     async function loadUserBusinesses() {
@@ -85,7 +102,14 @@ export default function SetupPage() {
         title: "Business Selected",
         description: `Now managing ${business.name}`,
       });
-      router.push("/dashboard");
+      
+      // Show Google Drive setup if not already connected
+      if (!business.googleDrive?.accessToken) {
+        setSelectedBusinessForGDrive(business);
+        setShowGoogleDriveSetup(true);
+      } else {
+        router.push("/dashboard");
+      }
     } catch (error) {
       console.error("Failed to select business:", error);
       toast({
@@ -117,9 +141,13 @@ export default function SetupPage() {
       const updatedBusinesses = await getUserBusinesses();
       setUserBusinesses(updatedBusinesses);
 
-      // Reset form and show business selection
+      // Reset form
       setNewBusinessData({ name: "", type: "", location: "" });
       setShowCreateForm(false);
+
+      // Show Google Drive setup for new business
+      setSelectedBusinessForGDrive(newBusiness);
+      setShowGoogleDriveSetup(true);
     } catch (error) {
       console.error("Failed to create business:", error);
       toast({
@@ -128,6 +156,18 @@ export default function SetupPage() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleGoogleDriveComplete = (config: GoogleDriveConfig) => {
+    toast({
+      title: "Setup Complete!",
+      description: "Your business is ready to process expenses.",
+    });
+    router.push("/dashboard");
+  };
+
+  const handleGoogleDriveSkip = () => {
+    router.push("/dashboard");
   };
 
   // Loading state
@@ -157,23 +197,45 @@ export default function SetupPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-lg shadow-sm border p-6 space-y-6">
-          {/* Header */}
-          <div className="text-center space-y-2">
-            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
-              <Building className="h-8 w-8 text-primary" />
+        {showGoogleDriveSetup && selectedBusinessForGDrive ? (
+          <div className="bg-white rounded-lg shadow-sm border p-6 space-y-6">
+            {/* Header */}
+            <div className="text-center space-y-2">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                <Building className="h-8 w-8 text-primary" />
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Setup Complete! 🎉
+              </h1>
+              <p className="text-gray-600">
+                {selectedBusinessForGDrive.name} is ready. Would you like to connect Google Drive?
+              </p>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {userBusinesses.length > 0 && !showCreateForm
-                ? "Select Business"
-                : "Create Your Business"}
-            </h1>
-            <p className="text-gray-600">
-              {userBusinesses.length > 0 && !showCreateForm
-                ? "Choose which business you'd like to manage"
-                : "Set up your business profile to get started with ExpenseBot"}
-            </p>
+
+            <GoogleDriveSetup 
+              businessId={selectedBusinessForGDrive.id}
+              onComplete={handleGoogleDriveComplete}
+              onSkip={handleGoogleDriveSkip}
+            />
           </div>
+        ) : (
+          <div className="bg-white rounded-lg shadow-sm border p-6 space-y-6">
+            {/* Header */}
+            <div className="text-center space-y-2">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                <Building className="h-8 w-8 text-primary" />
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {userBusinesses.length > 0 && !showCreateForm
+                  ? "Select Business"
+                  : "Create Your Business"}
+              </h1>
+              <p className="text-gray-600">
+                {userBusinesses.length > 0 && !showCreateForm
+                  ? "Choose which business you'd like to manage"
+                  : "Set up your business profile to get started with ExpenseBot"}
+              </p>
+            </div>
 
           {/* Multiple businesses - selection view */}
           {userBusinesses.length > 0 && !showCreateForm && (
@@ -365,7 +427,8 @@ export default function SetupPage() {
               Logout
             </Button>
           </div>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
