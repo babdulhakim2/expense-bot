@@ -72,7 +72,7 @@ jobs:
       #     name: backend-test-results
       #     path: |
       #       backend/junit.xml
-            # backend/htmlcov/
+      # backend/htmlcov/
 
   # Security Scanning
   # security-scan:
@@ -163,10 +163,9 @@ jobs:
             --platform managed \
             --region us-central1 \
             --allow-unauthenticated \
-            --set-env-vars="ENVIRONMENT=production" \
             --max-instances=100 \
-            --cpu=2 \
-            --memory=2Gi
+            --cpu=1 \
+            --memory=512Mi
 
       - name: Update traffic allocation
         run: |
