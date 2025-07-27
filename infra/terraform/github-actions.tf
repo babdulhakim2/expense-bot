@@ -1,11 +1,11 @@
 # GitHub Actions Service Account and Permissions
 # This file manages the service account used by GitHub Actions for CI/CD
 
-# GitHub Actions service account
-resource "google_service_account" "github_actions" {
-  account_id   = "expense-bot-githubactions"
-  display_name = "GitHub Actions Service Account"
-  description  = "Service account for GitHub Actions CI/CD deployments"
+# Data source for existing GitHub Actions service account
+# This service account should be created manually or via script
+data "google_service_account" "github_actions" {
+  account_id = "expense-bot-githubactions"
+  project    = var.project_id
 }
 
 # Project-level IAM roles for GitHub Actions
@@ -25,14 +25,14 @@ resource "google_project_iam_member" "github_actions_roles" {
 
   project = var.project_id
   role    = each.value
-  member  = "serviceAccount:${google_service_account.github_actions.email}"
+  member  = "serviceAccount:${data.google_service_account.github_actions.email}"
 }
 
 # Allow GitHub Actions to act as the Cloud Run service account
 resource "google_service_account_iam_member" "github_actions_can_act_as_cloud_run" {
   service_account_id = google_service_account.cloud_run.name
   role               = "roles/iam.serviceAccountUser"
-  member             = "serviceAccount:${google_service_account.github_actions.email}"
+  member             = "serviceAccount:${data.google_service_account.github_actions.email}"
 }
 
 # Allow GitHub Actions to act as the Cloud Functions service account (development)
@@ -40,7 +40,7 @@ resource "google_service_account_iam_member" "github_actions_can_act_as_function
   count              = var.deploy_applications && var.environment == "development" ? 1 : 0
   service_account_id = "projects/${var.project_id}/serviceAccounts/expense-function-development@${var.project_id}.iam.gserviceaccount.com"
   role               = "roles/iam.serviceAccountUser"
-  member             = "serviceAccount:${google_service_account.github_actions.email}"
+  member             = "serviceAccount:${data.google_service_account.github_actions.email}"
 }
 
 # Allow GitHub Actions to act as the Cloud Functions service account (production)
@@ -48,11 +48,11 @@ resource "google_service_account_iam_member" "github_actions_can_act_as_function
   count              = var.deploy_applications && var.environment == "production" ? 1 : 0
   service_account_id = "projects/${var.project_id}/serviceAccounts/expense-function-production@${var.project_id}.iam.gserviceaccount.com"
   role               = "roles/iam.serviceAccountUser"
-  member             = "serviceAccount:${google_service_account.github_actions.email}"
+  member             = "serviceAccount:${data.google_service_account.github_actions.email}"
 }
 
 # Output the GitHub Actions service account email for reference
 output "github_actions_service_account" {
   description = "Email of the GitHub Actions service account"
-  value       = google_service_account.github_actions.email
+  value       = data.google_service_account.github_actions.email
 }
