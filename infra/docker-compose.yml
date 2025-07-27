@@ -1,0 +1,206 @@
+version: '3.8'
+
+services:
+  # Backend API Service
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: expense-bot-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - PROJECT_ID=expense-bot-dev
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - UPLOADS_BUCKET=expense-bot-dev-uploads
+    volumes:
+      - ../backend:/app
+      - backend_cache:/app/__pycache__
+      - ../backend/logs:/app/logs
+    networks:
+      - expense-bot-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend Next.js Service
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: expense-bot-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - NEXT_PUBLIC_ENVIRONMENT=development
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - expense-bot-network
+    depends_on:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # MinIO for local S3-compatible storage
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: expense-bot-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: admin123456
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - expense-bot-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: expense-bot-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    networks:
+      - expense-bot-network
+    restart: unless-stopped
+
+  # Grafana for metrics visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: expense-bot-grafana
+    ports:
+      - "3002:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - expense-bot-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # Jaeger for distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: expense-bot-jaeger
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    volumes:
+      - jaeger_data:/badger
+    networks:
+      - expense-bot-network
+    restart: unless-stopped
+
+  # LLM Service (optional, for local ML inference)
+  llm-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.llm
+    container_name: expense-bot-llm
+    ports:
+      - "8081:8080"
+    environment:
+      - MODEL_PATH=/models
+      - DEVICE=cpu
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./models:/models
+      - llm_cache:/app/cache
+    networks:
+      - expense-bot-network
+    restart: unless-stopped
+    profiles:
+      - llm
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+  # ML Flow for experiment tracking
+  mlflow:
+    image: python:3.11-slim
+    container_name: expense-bot-mlflow
+    ports:
+      - "5000:5000"
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=postgresql://expense_bot:dev_password_123@postgres:5432/expense_bot_dev
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=s3://mlflow-artifacts/
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=admin123456
+      - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
+    command: >
+      bash -c "
+        pip install mlflow psycopg2-binary boto3 &&
+        mlflow server --host 0.0.0.0 --port 5000
+      "
+    networks:
+      - expense-bot-network
+    depends_on:
+      - postgres
+      - minio
+    restart: unless-stopped
+    profiles:
+      - mlops
+
+volumes:
+  minio_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  jaeger_data:
+    driver: local
+  backend_cache:
+    driver: local
+  llm_cache:
+    driver: local
+
+networks:
+  expense-bot-network:
+    driver: bridge
