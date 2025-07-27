@@ -192,6 +192,15 @@ jobs:
             -var-file=environments/${{ steps.env.outputs.environment }}.tfvars \
             -out=tfplan
 
+      - name: Package and upload Cloud Function
+        run: |
+          # Create zip of function source
+          cd backend/functions/expense_processor
+          zip -r function-source.zip . -x "*.pyc" "__pycache__/*" ".pytest_cache/*"
+          
+          # Upload to function source bucket
+          gsutil cp function-source.zip gs://${{ secrets.GCP_PROJECT_ID }}-function-source-${{ steps.env.outputs.environment }}/function-source.zip
+
       - name: Terraform Apply
         working-directory: infra/terraform
         run: terraform apply tfplan
