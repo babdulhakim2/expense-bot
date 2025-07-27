@@ -1,0 +1,42 @@
+name: Deploy Cloud Functions
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'backend/functions/**'
+      - 'backend/core/**'
+
+jobs:
+  deploy-functions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Deploy Functions
+        run: |
+          ENV=${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
+          
+          cd backend/functions/expense_processor
+          zip -r function-source.zip . -x "*.pyc" "*/__pycache__/*"
+          
+          gsutil cp function-source.zip gs://expense-bot-441618-function-source-$ENV/
+          
+          gcloud functions deploy expense-processor-$ENV \
+            --gen2 \
+            --runtime=python311 \
+            --region=us-central1 \
+            --source=gs://expense-bot-441618-function-source-$ENV/function-source.zip \
+            --entry-point=process_expenses \
+            --trigger-topic=expense-organization-$ENV \
+            --set-env-vars="GIT_SHA=${{ github.sha }},BRANCH=${{ github.ref_name }}"
