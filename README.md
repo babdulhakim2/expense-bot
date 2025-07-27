@@ -1,4 +1,4 @@
-# 🚀 DriveBot - AI That Organizes Your Expenses in Google Drive
+# 🚀 ExpenseBot - AI That Organizes Your Finances in Google Drive
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -11,7 +11,7 @@ Give AI access to two Google Drive folders and watch it automatically organize y
 
 ## 🏗️ System Overview
 
-DriveBot automates expense tracking by processing receipt images sent via WhatsApp, extracting structured data using custom PaliGemma models, and organizing expenses in Google Drive and Sheets.
+ExpenseBot automates expense tracking by processing receipt images sent via WhatsApp, extracting structured data using custom PaliGemma models, and organizing expenses in Google Drive and Sheets.
 
 ### Key Features
 
