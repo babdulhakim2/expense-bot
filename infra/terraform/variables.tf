@@ -95,6 +95,12 @@ variable "memory_limit" {
   default     = "512Mi"
 }
 
+variable "memory" {
+  description = "Memory limit for the application"
+  type        = string
+  default     = "512Mi"
+}
+
 variable "allowed_origins" {
   description = "List of allowed CORS origins"
   type        = list(string)
