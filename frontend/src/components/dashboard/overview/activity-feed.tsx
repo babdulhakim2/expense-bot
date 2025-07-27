@@ -27,27 +27,9 @@ interface AIAction {
 }
 import { formatDistanceToNow } from "date-fns";
 import {
-  AlertCircleIcon,
   ArrowDownIcon,
-  BarChartIcon,
-  BuildingIcon,
-  CalendarIcon,
-  CheckCircleIcon,
   ChevronRightIcon,
-  CreditCardIcon,
-  DollarSignIcon,
-  ExternalLinkIcon,
-  FileIcon,
-  FileSpreadsheetIcon,
-  FolderIcon,
-  FolderTreeIcon,
-  HashIcon,
-  LinkIcon,
-  LoaderIcon,
   MessageSquareIcon,
-  ReceiptIcon,
-  TableIcon,
-  TagIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -86,34 +68,20 @@ export function ActivityFeed() {
   }, [currentBusiness, isInitialized]);
 
   const getActionIcon = (action: AIAction) => {
-    const baseClass = "h-5 w-5";
-    const statusColors: { [key: string]: string } = {
-      completed: "text-green-600",
-      processing: "text-blue-600",
-      failed: "text-red-600",
-    };
-    const color = statusColors[action.status] || "text-gray-600";
-
     switch (action.action_type) {
       case "message_received":
       case "message_sent":
-        return <MessageSquareIcon className={`${baseClass} ${color}`} />;
+        return "💬";
       case "document_stored":
-        return <ReceiptIcon className={`${baseClass} ${color}`} />;
+        return "📄";
       case "spreadsheet_created":
-        return <FileSpreadsheetIcon className={`${baseClass} ${color}`} />;
+        return "📊";
       case "folder_created":
-        return <FolderIcon className={`${baseClass} ${color}`} />;
+        return "📁";
       case "transaction_recorded":
-        return action.amount ? (
-          <div className={`${color} font-semibold`}>
-            £{action.amount.toFixed(2)}
-          </div>
-        ) : (
-          <FileIcon className={`${baseClass} ${color}`} />
-        );
+        return "💰";
       default:
-        return <FileIcon className={`${baseClass} ${color}`} />;
+        return "📋";
     }
   };
 
@@ -149,85 +117,66 @@ export function ActivityFeed() {
           const details = parseTransactionMessage(action.content || "");
 
           return (
-            <div className="space-y-3">
-              {/* Transaction Details Section */}
-              <div className="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-lg">
-                <div className="flex items-center gap-2 text-sm">
-                  <HashIcon className="h-4 w-4 text-gray-400" />
-                  <span className="text-gray-600 font-mono">{details.id}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <DollarSignIcon className="h-4 w-4 text-emerald-500" />
-                  <span className="font-semibold">£{details.amount}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <CalendarIcon className="h-4 w-4 text-blue-400" />
-                  <span>{details.date}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <CreditCardIcon className="h-4 w-4 text-purple-400" />
-                  <span>{details.paymentMethod}</span>
-                </div>
-                <div className="col-span-2 flex items-center gap-2 text-sm">
-                  <BuildingIcon className="h-4 w-4 text-gray-400" />
-                  <span className="font-medium">{details.merchant}</span>
-                </div>
-                <div className="col-span-2">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    <TagIcon className="h-3 w-3 mr-1" />
-                    {details.category}
-                  </span>
-                </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-3 text-xs text-gray-600">
+                <span>🏷️ {details.category}</span>
+                <span>💰 £{details.amount}</span>
+                <span>💳 {details.paymentMethod}</span>
+                <span>🏢 {details.merchant}</span>
               </div>
-
-              {/* Quick Links Section */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Quick Access
-                </p>
-                <div className="grid grid-cols-2 gap-2">
+              {links.length > 0 && (
+                <div className="flex items-center gap-2">
                   {links.map((link, index) => (
                     <Link
                       key={index}
                       href={link.url}
                       target="_blank"
-                      className={`flex items-center gap-2 p-2 rounded-md text-sm transition-colors ${getLinkStyle(
-                        link.type
-                      )}`}
+                      className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
                     >
-                      {getLinkIcon(link.type)}
-                      <span className="truncate">{link.label}</span>
-                      <ExternalLinkIcon className="h-3 w-3 flex-shrink-0 ml-auto" />
+                      🔗 {link.label}
                     </Link>
                   ))}
                 </div>
-              </div>
+              )}
             </div>
           );
         }
-        return action.content || "No content";
+        return null;
       case "document_stored":
         return action.document_url ? (
           <Link
             href={action.document_url}
             target="_blank"
-            className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+            className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
           >
-            View document <ExternalLinkIcon className="h-3 w-3" />
+            🔗 View document
           </Link>
         ) : null;
       case "transaction_recorded":
         return (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex items-center gap-2 text-xs">
             {action.category && (
-              <span className="inline-flex items-center px-2 py-1 rounded-md bg-blue-50 text-xs font-medium text-blue-700">
-                {action.category}
-              </span>
+              <span className="text-gray-600">🏷️ {action.category}</span>
             )}
-            {action.description && (
-              <span className="text-gray-600">{action.description}</span>
+            {action.amount && (
+              <span className="text-gray-600">💰 £{action.amount.toFixed(2)}</span>
+            )}
+            {action.merchant && (
+              <span className="text-gray-600">🏢 {action.merchant}</span>
             )}
           </div>
+        );
+      case "spreadsheet_created":
+        return (
+          <span className="text-xs text-gray-600">
+            📅 {action.month} {action.year}
+          </span>
+        );
+      case "folder_created":
+        return (
+          <span className="text-xs text-gray-600">
+            💼 {action.name}
+          </span>
         );
       default:
         return null;
@@ -311,13 +260,13 @@ export function ActivityFeed() {
   const getLinkIcon = (type: string) => {
     switch (type) {
       case "spreadsheet":
-        return <TableIcon className="h-4 w-4" />;
+        return "📊";
       case "folder":
-        return <FolderTreeIcon className="h-4 w-4" />;
+        return "📁";
       case "dashboard":
-        return <BarChartIcon className="h-4 w-4" />;
+        return "📊";
       default:
-        return <LinkIcon className="h-4 w-4" />;
+        return "🔗";
     }
   };
 
@@ -342,7 +291,7 @@ export function ActivityFeed() {
           </div>
         </div>
         <div className="p-8 text-center">
-          <MessageSquareIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+          <div className="text-4xl mb-4">💬</div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">
             No Activity Yet
           </h3>
@@ -379,7 +328,7 @@ export function ActivityFeed() {
 
       {activities.length === 0 ? (
         <div className="p-8 text-center">
-          <MessageSquareIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+          <div className="text-4xl mb-4">💬</div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">
             No Activity Yet
           </h3>
@@ -393,44 +342,39 @@ export function ActivityFeed() {
             {displayedActivities.map((activity) => (
               <div
                 key={activity.id}
-                className="p-4 hover:bg-gray-50 transition-colors"
+                className={`px-3 py-2 hover:bg-gray-50 transition-colors border-l-2 ${
+                  activity.status === "completed"
+                    ? "border-l-green-500"
+                    : activity.status === "processing"
+                    ? "border-l-blue-500"
+                    : "border-l-red-500"
+                }`}
               >
-                <div className="flex items-start gap-4">
-                  <div
-                    className={`p-2 rounded-lg ${
-                      activity.status === "completed"
-                        ? "bg-green-50"
-                        : activity.status === "processing"
-                        ? "bg-blue-50"
-                        : "bg-red-50"
-                    }`}
-                  >
-                    {getActionIcon(activity)}
-                  </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">{getActionIcon(activity)}</span>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 text-sm">
                       <span className="font-medium text-gray-900">
                         {getActionTitle(activity)}
                       </span>
+                      <span className="text-xs text-gray-400">•</span>
+                      <span className="text-xs text-gray-400">
+                        {formatDistanceToNow(
+                          new Date(activity.timestamp || activity.createdAt),
+                          { addSuffix: true }
+                        )}
+                      </span>
                       {activity.status === "completed" && (
-                        <CheckCircleIcon className="h-4 w-4 text-green-600" />
+                        <span className="text-green-600">✓</span>
                       )}
                       {activity.status === "processing" && (
-                        <LoaderIcon className="h-4 w-4 text-blue-600 animate-spin" />
+                        <span className="text-blue-600 animate-pulse">⏳</span>
                       )}
                       {activity.status === "failed" && (
-                        <AlertCircleIcon className="h-4 w-4 text-red-600" />
+                        <span className="text-red-600">❌</span>
                       )}
                     </div>
-                    <div className="mt-1">{getActionDetails(activity)}</div>
-                    <p className="text-xs text-gray-400 mt-2">
-                      {formatDistanceToNow(
-                        new Date(activity.timestamp || activity.createdAt),
-                        {
-                          addSuffix: true,
-                        }
-                      )}
-                    </p>
+                    <div className="mt-1 text-xs">{getActionDetails(activity)}</div>
                   </div>
                 </div>
               </div>

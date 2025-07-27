@@ -20,6 +20,8 @@ import {
 import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
 import { NoBusinessFallback } from "./no-business-fallback";
+import { AdminBusinessService } from "@/lib/firebase/services/admin-business-service";
+import { getServerUser } from "@/app/dashboard/actions";
 
 export function BusinessSelector() {
   const { currentBusiness, loadingStates, selectBusiness, refreshBusinesses } =
@@ -32,12 +34,17 @@ export function BusinessSelector() {
   // Load all businesses for the user
   useEffect(() => {
     const loadBusinesses = async () => {
-      if (!session?.user?.email) return;
+      const user = await getServerUser();
+
+      if (!user?.id) {
+        setLoadingBusinesses(false);
+        return;
+      }
 
       try {
         setLoadingBusinesses(true);
-        const userBusinesses = await BusinessService.getBusinessesByUserEmail(
-          session.user.email
+        const userBusinesses = await AdminBusinessService.getUserBusinesses(
+          user.id
         );
         setBusinesses(userBusinesses);
       } catch (error) {

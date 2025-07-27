@@ -73,7 +73,7 @@ export function DashboardHeader() {
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium">{session?.user?.name || 'User'}</p>
-                <p className="text-xs text-gray-500">{session?.user?.email || session?.user?.phoneNumber}</p>
+                <p className="text-xs text-gray-500">{session?.user?.email || ''}</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />

@@ -1,19 +1,20 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
-import { BusinessService } from '@/lib/firebase/services/business-service';
-import { 
-  FileSpreadsheetIcon, 
-  FolderIcon, 
-  PlusIcon, 
-  SearchIcon, 
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { BusinessService } from "@/lib/firebase/services/business-service";
+import {
+  FileSpreadsheetIcon,
+  FolderIcon,
+  PlusIcon,
+  SearchIcon,
   CalendarIcon,
   ReceiptIcon,
   ExternalLinkIcon,
-  ArrowUpDownIcon
+  ArrowUpDownIcon,
 } from "lucide-react";
-import { format } from 'date-fns';
+import { format } from "date-fns";
+import { useBusiness } from "@/app/providers/BusinessProvider";
 
 interface FolderItem {
   id: string;
@@ -43,35 +44,36 @@ export default function FoldersPage() {
   const [loading, setLoading] = useState(true);
   const [folders, setFolders] = useState<FolderItem[]>([]);
   const [spreadsheets, setSpreadsheets] = useState<SpreadsheetItem[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'folders' | 'spreadsheets'>('all');
-  const [sortBy, setSortBy] = useState<'name' | 'updated'>('updated');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterType, setFilterType] = useState<
+    "all" | "folders" | "spreadsheets"
+  >("all");
+  const [sortBy, setSortBy] = useState<"name" | "updated">("updated");
+  const { currentBusiness } = useBusiness();
 
   useEffect(() => {
     async function loadBusinessData() {
       try {
-        if (session?.user?.email) {
-          const business = await BusinessService.getBusinessByUserEmail(session.user.email);
-          
+        if (currentBusiness) {
+          const business = await BusinessService.getBusiness(
+            currentBusiness?.id
+          );
+
           if (business) {
-            console.log('Business found:', business);
-            
+            console.log("Business found:", business);
+
             const [folders, spreadsheets, actions] = await Promise.all([
               BusinessService.getBusinessFolders(business.id),
               BusinessService.getBusinessSpreadsheets(business.id),
-              BusinessService.getBusinessActions(business.id)
+              BusinessService.getBusinessActions(business.id),
             ]);
 
-            console.log('Business Folders:', folders);
-            console.log('Business Spreadsheets:', spreadsheets);
-            console.log('Business Actions:', actions);
-            
             setFolders(folders);
             setSpreadsheets(spreadsheets);
           }
         }
       } catch (err) {
-        console.error('Error loading business data:', err);
+        console.error("Error loading business data:", err);
       } finally {
         setLoading(false);
       }
@@ -80,22 +82,24 @@ export default function FoldersPage() {
     loadBusinessData();
   }, [session]);
 
-
-  const filteredItems = [...folders, ...spreadsheets].filter(item => {
-    if (searchTerm && !item.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+  const filteredItems = [...folders, ...spreadsheets].filter((item) => {
+    if (
+      searchTerm &&
+      !item.name.toLowerCase().includes(searchTerm.toLowerCase())
+    ) {
       return false;
     }
-    if (filterType === 'folders' && 'drive_id' in item) {
+    if (filterType === "folders" && "drive_id" in item) {
       return false;
     }
-    if (filterType === 'spreadsheets' && !('drive_id' in item)) {
+    if (filterType === "spreadsheets" && !("drive_id" in item)) {
       return false;
     }
     return true;
   });
 
   const sortedItems = [...filteredItems].sort((a, b) => {
-    if (sortBy === 'name') {
+    if (sortBy === "name") {
       return a.name.localeCompare(b.name);
     }
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
@@ -116,15 +120,17 @@ export default function FoldersPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">My Documents</h1>
-            <p className="text-sm text-gray-500 mt-1">Manage your financial documents and spreadsheets</p>
+            <p className="text-sm text-gray-500 mt-1">
+              Manage your financial documents and spreadsheets
+            </p>
           </div>
           <div className="flex gap-2">
-            <button 
-              onClick={() => setSortBy(sortBy === 'name' ? 'updated' : 'name')}
+            <button
+              onClick={() => setSortBy(sortBy === "name" ? "updated" : "name")}
               className="flex items-center gap-2 px-3 py-2 bg-white text-gray-700 rounded-md border hover:bg-gray-50"
             >
               <ArrowUpDownIcon className="h-4 w-4" />
-              Sort by {sortBy === 'name' ? 'Name' : 'Last Updated'}
+              Sort by {sortBy === "name" ? "Name" : "Last Updated"}
             </button>
             <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
               <PlusIcon className="h-4 w-4" />
@@ -145,9 +151,13 @@ export default function FoldersPage() {
               className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <select 
+          <select
             value={filterType}
-            onChange={(e) => setFilterType(e.target.value as 'all' | 'folders' | 'spreadsheets')}
+            onChange={(e) =>
+              setFilterType(
+                e.target.value as "all" | "folders" | "spreadsheets"
+              )
+            }
             className="px-3 py-2 bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All Items</option>
@@ -159,8 +169,8 @@ export default function FoldersPage() {
         {/* Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {sortedItems.map((item) => {
-            const isSpreadsheet = 'drive_id' in item;
-            
+            const isSpreadsheet = "drive_id" in item;
+
             return (
               <a
                 key={item.id}
@@ -177,7 +187,7 @@ export default function FoldersPage() {
                       </div>
                     ) : (
                       <div className="p-2 bg-blue-50 rounded-lg">
-                        {item.type.includes('receipt') ? (
+                        {item.type.includes("receipt") ? (
                           <ReceiptIcon className="h-6 w-6 text-blue-600" />
                         ) : (
                           <FolderIcon className="h-6 w-6 text-blue-600" />
@@ -198,11 +208,14 @@ export default function FoldersPage() {
                             </span>
                           </>
                         ) : (
-                          <span className="capitalize">{item.type.replace(/_/g, ' ')}</span>
+                          <span className="capitalize">
+                            {item.type.replace(/_/g, " ")}
+                          </span>
                         )}
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
-                        Updated {format(new Date(item.updatedAt), 'MMM d, yyyy')}
+                        Updated{" "}
+                        {format(new Date(item.updatedAt), "MMM d, yyyy")}
                       </p>
                     </div>
                   </div>
@@ -214,4 +227,4 @@ export default function FoldersPage() {
       </div>
     </div>
   );
-} 
+}
