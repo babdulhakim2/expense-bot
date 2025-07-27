@@ -102,5 +102,7 @@ class Config:
         # Set additional config values
         cls.GOOGLE_SERVICE_ACCOUNT_KEY = cls.SERVICE_ACCOUNT_KEY
 
-# Load and validate configuration
-Config.validate_config()
+# Load and validate configuration only if not in Cloud Functions
+import os
+if not os.environ.get('FUNCTION_NAME'):  # Cloud Functions set this automatically
+    Config.validate_config()

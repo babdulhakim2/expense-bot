@@ -25,6 +25,10 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+# Import and register blueprints
+from routes.tasks import tasks_bp
+app.register_blueprint(tasks_bp)
+
 # Initialize services with config
 gemini_service = AIService()  # Primary service now
 

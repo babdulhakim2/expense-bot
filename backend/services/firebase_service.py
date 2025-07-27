@@ -29,19 +29,24 @@ try:
     import tempfile
     import json
     
-    service_account_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
-    json.dump(json.loads(Config.SERVICE_ACCOUNT_KEY), service_account_file)
-    service_account_file.close()
-    
-    # Update your credentials initialization
-    creds = ServiceAccountCredentials.from_json_keyfile_name(service_account_file.name, scope)
+    # Check if we're in Cloud Functions with mounted secrets
+    if os.environ.get('FUNCTION_NAME') and not Config.SERVICE_ACCOUNT_KEY:
+        logger.info("Running in Cloud Function, skipping Google Sheets/Drive setup")
+        creds = None
+    else:
+        service_account_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
+        json.dump(json.loads(Config.SERVICE_ACCOUNT_KEY), service_account_file)
+        service_account_file.close()
+        
+        # Update your credentials initialization
+        creds = ServiceAccountCredentials.from_json_keyfile_name(service_account_file.name, scope)
     
 except Exception as e:
     logger.error(f"Failed to initialize credentials: {str(e)}")
-    raise
+    creds = None
 
-sheets_client = gspread.authorize(creds)
-drive_service = build('drive', 'v3', credentials=creds)
+sheets_client = gspread.authorize(creds) if creds else None
+drive_service = build('drive', 'v3', credentials=creds) if creds else None
 
 class FirebaseService:
     def __init__(self):
@@ -121,7 +126,7 @@ class FirebaseService:
         try:
             # Query businesses where user is owner
             businesses = self.db.collection('businesses')\
-                .where('ownerId', '==', user_id)\
+                .where('userId', '==', user_id)\
                 .limit(1)\
                 .stream()
 
@@ -143,7 +148,7 @@ class FirebaseService:
                 'createdAt': firestore.SERVER_TIMESTAMP,
                 'updatedAt': firestore.SERVER_TIMESTAMP,
                 'type': 'small_business',
-                'ownerId': user_id
+                'userId': user_id
             }
             
             business_ref.set(business_data)

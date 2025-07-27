@@ -1,0 +1,6 @@
+functions-framework==3.5.0
+firebase-admin==6.6.0
+google-cloud-firestore==2.19.0
+google-ai-generativelanguage==0.6.10
+google-generativeai==0.8.3
+python-dotenv==1.0.1
