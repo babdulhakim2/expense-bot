@@ -154,7 +154,7 @@ resource "google_cloud_run_service" "backend_api" {
         resources {
           limits = {
             cpu    = var.environment == "production" ? "2" : "1"
-            memory = var.environment == "production" ? "2Gi" : "512Mi"
+            memory = var.environment == "production" ? "512Mi" : "512Mi"
           }
           requests = {
             cpu    = var.environment == "production" ? "1" : "0.5"

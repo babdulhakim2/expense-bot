@@ -121,6 +121,32 @@ class FirebaseService:
             logger.error(f"Error getting user by phone: {str(e)}")
             return None
 
+    def get_user_businesses(self, user_id: str) -> List[Dict[str, Any]]:
+        """Get all businesses where user is owner"""
+        try:
+            # Query businesses where user is owner
+            businesses = self.db.collection('businesses')\
+                .where('userId', '==', user_id)\
+                .order_by('createdAt', direction=firestore.Query.DESCENDING)\
+                .stream()
+
+            # Convert to list of dicts
+            business_list = []
+            for business_doc in businesses:
+                business_data = business_doc.to_dict()
+                business_data['id'] = business_doc.id
+                # Convert Firestore timestamps to ISO strings for JSON serialization
+                if 'createdAt' in business_data and business_data['createdAt']:
+                    business_data['createdAt'] = business_data['createdAt'].isoformat()
+                if 'updatedAt' in business_data and business_data['updatedAt']:
+                    business_data['updatedAt'] = business_data['updatedAt'].isoformat()
+                business_list.append(business_data)
+
+            return business_list
+        except Exception as e:
+            logger.error(f"Error getting user businesses: {str(e)}")
+            return []
+
     def get_active_business(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get first business where user is owner or create default"""
         try:

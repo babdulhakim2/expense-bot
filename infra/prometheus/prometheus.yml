@@ -1,0 +1,67 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "alert_rules.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ExpenseBot Backend
+  - job_name: 'expense-bot-backend'
+    static_configs:
+      - targets: ['backend:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # ExpenseBot Frontend (if it exposes metrics)
+  - job_name: 'expense-bot-frontend'
+    static_configs:
+      - targets: ['frontend:3000']
+    metrics_path: '/api/metrics'
+    scrape_interval: 30s
+
+  # Redis metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+
+  # PostgreSQL metrics (if using postgres_exporter)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres_exporter:9187']
+
+  # Nginx metrics (if using nginx_exporter)
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx_exporter:9113']
+
+  # Node exporter for system metrics
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node_exporter:9100']
+
+  # cAdvisor for container metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+
+  # Custom application metrics
+  - job_name: 'expense-bot-custom'
+    static_configs:
+      - targets: ['backend:8080']
+    metrics_path: '/api/metrics'
+    scrape_interval: 30s
+    params:
+      format: ['prometheus']

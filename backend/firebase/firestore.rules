@@ -23,8 +23,8 @@ service cloud.firestore {
       // Allow read if user is authenticated and owns the business
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
       
-      // Allow list queries if user is authenticated (for getUserBusinesses)
-      allow list: if isAuthenticated();
+      // Allow list queries only for businesses owned by the authenticated user
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
       
       // Allow create if user is authenticated
       allow create: if isAuthenticated();

@@ -11,6 +11,7 @@ min_instances  = 1
 max_instances  = 100
 cpu_limit     = "1"
 memory_limit  = "512Mi"
+memory = "512Mi"  # Memory limit for the application
 
 # Features
 deploy_applications = true   # Applications deployed in production

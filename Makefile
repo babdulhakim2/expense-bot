@@ -179,11 +179,11 @@ docker-clean: ## Clean Docker containers and volumes
 # Deployment targets
 deploy-dev: ## Deploy to development environment
 	@echo "🚀 Deploying to development..."
-	@cd infra/terraform && terraform apply -var-file=environments/development.tfvars
+	@./scripts/deploy.sh development
 
 deploy-prod: ## Deploy to production environment
 	@echo "🚀 Deploying to production..."
-	@cd infra/terraform && terraform apply -var-file=environments/production.tfvars
+	@./scripts/deploy.sh production
 
 destroy-dev: ## Destroy development environment
 	@echo "💥 Destroying development..."
