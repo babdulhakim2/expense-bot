@@ -1,0 +1,21 @@
+# Terraform files
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.json
+*.tfstate.backup
+*.tfstate.lock.info
+*.tfstate.lock
+*.tfstate.malformed
+*.tfstate.backup.*
+*.tfstate.backup.json
+*.tfstate.backup.backup
+*.terraform
+.terraform.lock.hcl
+
+# Terraform variables - allow environment configs but block sensitive files
+*.tfvars.json
+terraform.tfvars
+secrets.tfvars
+local.tfvars
+!environments/*.tfvars
