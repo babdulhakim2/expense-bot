@@ -368,7 +368,7 @@ class FirebaseService:
                 
                 business_data = business.to_dict()
                 business_name = business_data.get('name', f'Business-{business_id}')
-                owner_email = business_data.get('ownerEmail')
+                owner_email = business_data.get('primaryEmail')
                 
                 if not owner_email:
                     raise ValueError(f"Owner email not found for business {business_id}")
@@ -544,7 +544,7 @@ class FirebaseService:
         try:
             business = self.db.collection('businesses').document(business_id).get()
             if business.exists:
-                return business.to_dict().get('ownerEmail')
+                return business.to_dict().get('primaryEmail')
             return None
         except Exception as e:
             logger.error(f"Error getting owner email: {str(e)}")

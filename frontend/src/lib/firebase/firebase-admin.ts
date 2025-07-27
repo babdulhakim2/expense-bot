@@ -15,7 +15,7 @@ try {
       process.env.FIRESTORE_EMULATOR_HOST = 'localhost:8080';
 
       initializeApp({
-        projectId: 'expense-bot-9906c',
+        projectId: process.env.FIREBASE_PROJECT_ID,
       });
 
       console.log('Firebase Admin initialized with emulator');

@@ -92,20 +92,10 @@ if (process.env.NODE_ENV === "development" && !emulatorsConnected) {
       "⚠️ Emulator connection error (might already be connected):",
       error
     );
-    emulatorsConnected = true; // Assume already connected
+    emulatorsConnected = true; 
   }
 } else if (process.env.NODE_ENV !== "development") {
   console.log("⚠️ Using Production Firebase");
 }
-
-// Add connection error handlers
-auth.onAuthStateChanged((user) => {
-  if (process.env.NODE_ENV === "development") {
-    console.log(
-      "🔐 Auth state changed:",
-      user ? `User: ${user.email}` : "No user"
-    );
-  }
-});
 
 export { app, auth, db };

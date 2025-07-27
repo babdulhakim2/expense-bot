@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
-import { BusinessQuickCreateForm } from "./business-quick-create-form";
+import { BusinessCreateDialog } from "./business-create-dialog";
 
 export function SmartBusinessSelector() {
   const {
@@ -26,7 +26,7 @@ export function SmartBusinessSelector() {
     selectBusiness,
   } = useBusiness();
 
-  const [showQuickCreate, setShowQuickCreate] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   if (!isInitialized || loadingStates.loading) {
     return (
@@ -43,21 +43,8 @@ export function SmartBusinessSelector() {
   // No businesses state - show creation prompt
   if (!hasBusinesses) {
     return (
-      <div className="px-4 py-2">
-        {/* Quick create form */}
-        {showQuickCreate ? (
-          <BusinessQuickCreateForm
-            onSuccess={(business) => {
-              setShowQuickCreate(false);
-              toast({
-                title: "Business Created",
-                description: `${business.name} is now active`,
-              });
-            }}
-            onCancel={() => setShowQuickCreate(false)}
-            isCreating={loadingStates.creating}
-          />
-        ) : (
+      <>
+        <div className="px-4 py-2">
           <div className="text-center space-y-3">
             <div className="flex items-center justify-center w-12 h-12 bg-gray-800 rounded-lg mx-auto">
               <Building2Icon className="h-6 w-6 text-gray-400" />
@@ -71,7 +58,7 @@ export function SmartBusinessSelector() {
               </p>
             </div>
             <Button
-              onClick={() => setShowQuickCreate(true)}
+              onClick={() => setShowCreateDialog(true)}
               size="sm"
               className="w-full"
               disabled={loadingStates.creating}
@@ -89,8 +76,18 @@ export function SmartBusinessSelector() {
               )}
             </Button>
           </div>
-        )}
-      </div>
+        </div>
+        <BusinessCreateDialog
+          open={showCreateDialog}
+          onOpenChange={setShowCreateDialog}
+          onSuccess={(business) => {
+            toast({
+              title: "Business Created",
+              description: `${business.name} is now active`,
+            });
+          }}
+        />
+      </>
     );
   }
 
@@ -118,24 +115,12 @@ export function SmartBusinessSelector() {
   };
 
   const handleCreateNew = () => {
-    setShowQuickCreate(true);
+    setShowCreateDialog(true);
   };
 
   return (
-    <div className="px-4 py-2">
-      {showQuickCreate ? (
-        <BusinessQuickCreateForm
-          onSuccess={(business) => {
-            setShowQuickCreate(false);
-            toast({
-              title: "Business Created",
-              description: `${business.name} is now active`,
-            });
-          }}
-          onCancel={() => setShowQuickCreate(false)}
-          isCreating={loadingStates.creating}
-        />
-      ) : (
+    <>
+      <div className="px-4 py-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -209,7 +194,18 @@ export function SmartBusinessSelector() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      )}
-    </div>
+      </div>
+      
+      <BusinessCreateDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        onSuccess={(business) => {
+          toast({
+            title: "Business Created",
+            description: `${business.name} is now active`,
+          });
+        }}
+      />
+    </>
   );
 }

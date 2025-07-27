@@ -5,11 +5,8 @@ import { cn } from "@/lib/utils";
 import {
   FolderIcon,
   HomeIcon,
-  LogOutIcon,
-  QrCodeIcon,
-  SettingsIcon
+  QrCodeIcon
 } from "lucide-react";
-import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -18,7 +15,6 @@ import { SmartBusinessSelector } from '../business/smart-business-selector';
 const navigationItems = [
   { name: 'Overview', href: '/dashboard', icon: HomeIcon },
   { name: 'Drive', href: '/dashboard/folders', icon: FolderIcon },
-  { name: 'Settings', href: '/dashboard/settings', icon: SettingsIcon },
 ];
 
 export function SidebarNav() {
@@ -62,15 +58,6 @@ export function SidebarNav() {
         </button>
       </div>
 
-      <div className="p-4 border-t border-gray-800">
-        <button
-          onClick={() => signOut()}
-          className="flex items-center px-3 py-2 text-sm text-gray-300 rounded-md hover:bg-gray-800 hover:text-white w-full"
-        >
-          <LogOutIcon className="h-5 w-5 mr-3" />
-          Sign out
-        </button>
-      </div>
 
       {/* QR Code Modal */}
       {showQR && (

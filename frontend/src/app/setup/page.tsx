@@ -17,6 +17,7 @@ import { ArrowRight, Building, CheckCircle, Loader2, Plus } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { signOut } from "next-auth/react";
 
 interface NewBusinessData {
   name: string;
@@ -353,7 +354,17 @@ export default function SetupPage() {
             >
               ← Back to Home
             </Button>
-            </div>
+
+            {/* add logout here  */}
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => signOut()}
+              className="text-xs text-gray-500 hover:text-gray-700 ml-2"
+            >
+              Logout
+            </Button>
+          </div>
         </div>
       </div>
     </div>

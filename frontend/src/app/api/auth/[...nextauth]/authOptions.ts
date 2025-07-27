@@ -23,7 +23,6 @@ const verifyToken = async (token: string): Promise<DecodedIdToken | null> => {
     try {
       return await adminAuth.verifyIdToken(token);
     } catch (error) {
-      console.error("Error verifying production token:", error);
       return null;
     }
   }

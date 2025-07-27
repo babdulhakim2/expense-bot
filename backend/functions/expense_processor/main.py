@@ -51,6 +51,14 @@ class SimpleExpenseOrganizer:
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Deployment metadata
+DEPLOYMENT_INFO = {
+    "git_sha": os.environ.get("GIT_SHA", "unknown"),
+    "branch": os.environ.get("BRANCH", "unknown"),
+    "environment": os.environ.get("ENVIRONMENT", "unknown"),
+    "function_name": os.environ.get("FUNCTION_NAME", "unknown")
+}
+
 @functions_framework.cloud_event
 def process_expenses(cloud_event):
     """
@@ -58,6 +66,8 @@ def process_expenses(cloud_event):
     Thin wrapper around core logic.
     """
     try:
+        logger.info(f"Function deployment info: {DEPLOYMENT_INFO}")
+        
         # In Gen2, the Pub/Sub message data is in cloud_event.data
         message_data = {"action": "organize_expenses", "source": "pubsub"}
         
