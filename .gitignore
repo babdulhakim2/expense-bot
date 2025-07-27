@@ -12,6 +12,9 @@
 env_variables.yaml
 env_secrets.yaml
 .env.yaml
+.env.gcp
+!.env.example
+!.env.gcp.example
 
 # IDE and Editor files
 .vscode/
