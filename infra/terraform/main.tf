@@ -194,10 +194,10 @@ resource "google_cloud_run_service" "backend_api" {
             path = "/health"
             port = 8080
           }
-          initial_delay_seconds = 10
-          timeout_seconds       = 5
-          period_seconds        = 10
-          failure_threshold     = 3
+          initial_delay_seconds = 30
+          timeout_seconds       = 10
+          period_seconds        = 15
+          failure_threshold     = 5
         }
 
         liveness_probe {
