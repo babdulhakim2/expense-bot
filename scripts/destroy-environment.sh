@@ -24,6 +24,28 @@ echo "🗑️  Destroying $ENVIRONMENT environment..."
 
 cd "$(dirname "$0")/../infra/terraform"
 
+# Show current workspace for safety
+CURRENT_WORKSPACE=$(terraform workspace show)
+echo "📍 Current Terraform workspace: $CURRENT_WORKSPACE"
+
+if [[ "$CURRENT_WORKSPACE" != "$ENVIRONMENT" ]]; then
+    echo "🔄 Switching to $ENVIRONMENT workspace..."
+    terraform workspace select $ENVIRONMENT
+    echo "📍 Now in workspace: $(terraform workspace show)"
+fi
+
+# Final confirmation with workspace info
+echo ""
+echo "🎯 About to destroy: $ENVIRONMENT environment"
+echo "📍 Terraform workspace: $(terraform workspace show)"
+echo ""
+read -p "Type 'DESTROY' to proceed: " final_confirm
+
+if [[ "$final_confirm" != "DESTROY" ]]; then
+    echo "❌ Final confirmation failed. Aborted."
+    exit 1
+fi
+
 terraform destroy -var-file=environments/$ENVIRONMENT.tfvars -auto-approve
 
 echo "✅ $ENVIRONMENT environment destroyed"
