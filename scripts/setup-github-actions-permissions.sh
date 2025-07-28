@@ -45,6 +45,7 @@ PROJECT_ROLES=(
     "roles/artifactregistry.writer"    # Push container images
     "roles/cloudbuild.builds.builder"  # Build containers
     "roles/iam.serviceAccountUser"     # Use service accounts
+    "roles/iam.serviceAccountAdmin"    # Create and manage service accounts
     "roles/pubsub.admin"               # Manage Pub/Sub topics
     "roles/cloudscheduler.admin"       # Manage Cloud Scheduler
     "roles/secretmanager.secretAccessor" # Access secrets

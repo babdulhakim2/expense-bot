@@ -15,7 +15,7 @@ output "uploads_bucket" {
 
 output "service_account_email" {
   description = "Email of the Cloud Run service account"
-  value       = google_service_account.cloud_run.email
+  value       = data.google_service_account.cloud_run.email
 }
 
 output "artifact_registry_repository" {

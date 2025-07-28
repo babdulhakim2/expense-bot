@@ -71,27 +71,15 @@ resource "google_artifact_registry_repository" "expense_bot" {
   depends_on = [google_project_service.apis]
 }
 
-# Service Account for Cloud Run
-resource "google_service_account" "cloud_run" {
-  account_id   = "expense-bot-run"
-  display_name = "ExpenseBot Cloud Run Service Account"
-  description  = "Service account for ExpenseBot Cloud Run services"
+# Service Account for Cloud Run (pre-created, managed outside Terraform)
+data "google_service_account" "cloud_run" {
+  account_id = "expense-bot-run"
+  project    = var.project_id
 }
 
-# IAM roles for Cloud Run service account
-resource "google_project_iam_member" "cloud_run_roles" {
-  for_each = toset([
-    "roles/cloudsql.client",
-    "roles/secretmanager.secretAccessor",
-    "roles/storage.objectViewer",
-    "roles/firebase.admin",
-    "roles/aiplatform.user",
-  ])
-
-  project = var.project_id
-  role    = each.value
-  member  = "serviceAccount:${google_service_account.cloud_run.email}"
-}
+# Note: IAM roles for service accounts are managed outside of Terraform
+# to avoid giving GitHub Actions excessive permissions.
+# Run scripts/setup-service-accounts.sh to configure permissions.
 
 # Cloud Storage bucket for uploads
 resource "google_storage_bucket" "uploads" {
@@ -118,12 +106,9 @@ resource "google_storage_bucket" "uploads" {
   }
 }
 
-# IAM for uploads bucket
-resource "google_storage_bucket_iam_member" "uploads_admin" {
-  bucket = google_storage_bucket.uploads.name
-  role   = "roles/storage.admin"
-  member = "serviceAccount:${google_service_account.cloud_run.email}"
-}
+# IAM for uploads bucket - managed outside Terraform
+# The Cloud Run service account needs storage.admin role on this bucket
+# This is configured via scripts/setup-service-accounts.sh
 
 # Cloud Run service - Backend API
 resource "google_cloud_run_service" "backend_api" {
@@ -142,7 +127,7 @@ resource "google_cloud_run_service" "backend_api" {
     }
 
     spec {
-      service_account_name = google_service_account.cloud_run.email
+      service_account_name = data.google_service_account.cloud_run.email
 
       containers {
         image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.expense_bot.repository_id}/backend:latest"
@@ -272,7 +257,7 @@ resource "google_cloud_run_service_iam_member" "backend_invoker" {
 #     }
 
 #     spec {
-#       service_account_name = google_service_account.cloud_run.email
+#       service_account_name = data.google_service_account.cloud_run.email
 #       timeout_seconds      = 900 # 15 minutes for ML inference
 
 #       containers {
@@ -358,25 +343,16 @@ resource "google_pubsub_topic" "expense_organization" {
 }
 
 # Service account for Cloud Functions
-resource "google_service_account" "function_sa" {
-  count        = var.deploy_applications ? 1 : 0
-  account_id   = "expense-function-${var.environment}"
-  display_name = "ExpenseBot Function Service Account ${var.environment}"
+# Service Account for Cloud Functions (pre-created, managed outside Terraform)
+data "google_service_account" "function_sa" {
+  count      = var.deploy_applications ? 1 : 0
+  account_id = "expense-function-${var.environment}"
+  project    = var.project_id
 }
 
-# IAM for Cloud Functions
-resource "google_project_iam_member" "function_roles" {
-  for_each = var.deploy_applications ? toset([
-    "roles/datastore.user",
-    "roles/secretmanager.secretAccessor",
-    "roles/logging.logWriter",
-    "roles/storage.objectViewer"
-  ]) : toset([])
-
-  project = var.project_id
-  role    = each.value
-  member  = "serviceAccount:${google_service_account.function_sa[0].email}"
-}
+# Note: IAM roles for function service account are managed outside of Terraform
+# to avoid giving GitHub Actions excessive permissions.
+# Run scripts/setup-service-accounts.sh to configure permissions.
 
 # Cloud Storage bucket for function source code
 resource "google_storage_bucket" "function_source" {
@@ -410,7 +386,7 @@ resource "google_cloudfunctions2_function" "expense_processor" {
     min_instance_count    = 0
     available_memory      = "512Mi"
     timeout_seconds       = 540
-    service_account_email = google_service_account.function_sa[0].email
+    service_account_email = data.google_service_account.function_sa[0].email
 
     environment_variables = {
       PROJECT_ID    = var.project_id
@@ -424,7 +400,7 @@ resource "google_cloudfunctions2_function" "expense_processor" {
     event_type           = "google.cloud.pubsub.topic.v1.messagePublished"
     pubsub_topic         = google_pubsub_topic.expense_organization[0].id
     retry_policy         = "RETRY_POLICY_RETRY"
-    service_account_email = google_service_account.function_sa[0].email
+    service_account_email = data.google_service_account.function_sa[0].email
   }
 
   depends_on = [google_project_service.apis]
