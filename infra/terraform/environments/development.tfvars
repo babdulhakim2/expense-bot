@@ -10,6 +10,7 @@ min_instances  = 0
 max_instances  = 3
 cpu_limit     = "1"
 memory_limit  = "512Mi"
+memory = "512Mi"  # Memory limit for the application
 
 # Features
 deploy_applications = true  # Set to true after Docker images are built

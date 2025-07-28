@@ -53,11 +53,11 @@ resource "google_project_service" "apis" {
   disable_on_destroy = false
 }
 
-# Artifact Registry for container images
+# Artifact Registry for container images - environment specific
 resource "google_artifact_registry_repository" "expense_bot" {
   location      = var.region
-  repository_id = "expense-bot"
-  description   = "ExpenseBot container images"
+  repository_id = "expense-bot-${var.environment}"
+  description   = "ExpenseBot container images for ${var.environment}"
   format        = "DOCKER"
 
   cleanup_policies {

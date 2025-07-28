@@ -2,14 +2,13 @@ name: ExpenseBot CI/CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
 
 env:
   REGISTRY: us-central1-docker.pkg.dev
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  REPOSITORY: expense-bot
   BACKEND_IMAGE: backend
 
 jobs:
@@ -127,6 +126,15 @@ jobs:
       - name: Configure Docker to use gcloud
         run: gcloud auth configure-docker us-central1-docker.pkg.dev
 
+      - name: Determine environment for docker
+        id: docker_env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "repository=expense-bot-production" >> $GITHUB_OUTPUT
+          else
+            echo "repository=expense-bot-development" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build and push backend image
         run: |
           docker build \
@@ -134,17 +142,17 @@ jobs:
             --label "org.opencontainers.image.revision=${{ github.sha }}" \
             --label "org.opencontainers.image.ref.name=${{ github.ref_name }}" \
             --label "org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}" \
-            -t $REGISTRY/$PROJECT_ID/$REPOSITORY/$BACKEND_IMAGE:$GITHUB_SHA \
-            -t $REGISTRY/$PROJECT_ID/$REPOSITORY/$BACKEND_IMAGE:latest \
+            -t $REGISTRY/$PROJECT_ID/${{ steps.docker_env.outputs.repository }}/$BACKEND_IMAGE:$GITHUB_SHA \
+            -t $REGISTRY/$PROJECT_ID/${{ steps.docker_env.outputs.repository }}/$BACKEND_IMAGE:latest \
             ./backend
-          docker push $REGISTRY/$PROJECT_ID/$REPOSITORY/$BACKEND_IMAGE:$GITHUB_SHA
-          docker push $REGISTRY/$PROJECT_ID/$REPOSITORY/$BACKEND_IMAGE:latest
+          docker push $REGISTRY/$PROJECT_ID/${{ steps.docker_env.outputs.repository }}/$BACKEND_IMAGE:$GITHUB_SHA
+          docker push $REGISTRY/$PROJECT_ID/${{ steps.docker_env.outputs.repository }}/$BACKEND_IMAGE:latest
 
   # Deploy Infrastructure
   deploy-infrastructure:
     runs-on: ubuntu-latest
     needs: [docker-build]
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+    if: github.ref == 'refs/heads/main'
     
     steps:
       - name: Checkout code
