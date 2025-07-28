@@ -2,9 +2,9 @@ name: ExpenseBot CI/CD Pipeline
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main]
   pull_request:
-    branches: [main, dev]
+    branches: [main]
 
 env:
   REGISTRY: us-central1-docker.pkg.dev
