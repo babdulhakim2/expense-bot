@@ -17,6 +17,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { NoBusinessFallback } from "../business/no-business-fallback";
 import { ActivityFeed } from "./activity-feed";
+import { formatCurrency } from "@/lib/constants/currency";
 
 interface AIAction {
   id: string;
@@ -41,7 +42,7 @@ interface Stats {
 
 export function DashboardOverview() {
   const { currentBusiness, hasBusinesses, isInitialized } = useBusiness();
-  const [actions, setActions] = useState<AIAction[]>([]); // eslint-disable-line @typescript-eslint/no-unused-vars
+  const [actions, setActions] = useState<AIAction[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<Stats[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -56,13 +57,10 @@ export function DashboardOverview() {
           setActions(actions);
           calculateStats(actions);
         } else {
-          // No business - show empty state
           setActions([]);
           setStats([]);
         }
       } catch (err) {
-        console.error("Error loading dashboard data:", err);
-        // On Firebase error, fallback to empty state instead of crashing
         setActions([]);
         setStats([]);
       } finally {
@@ -140,23 +138,15 @@ export function DashboardOverview() {
 
     const newStats: Stats[] = [
       {
-        label: "Messages Processed",
-        value: currentMessages,
-        icon: MessageSquareIcon,
-        change: calculateChange(currentMessages, previousMessages),
-        trend: getTrend(currentMessages, previousMessages),
-        tooltip: "Total WhatsApp messages processed this month",
+        label: "Processed Amounts",
+        value: formatCurrency(currentAmount, currentBusiness?.currency),
+        icon: FileSpreadsheetIcon,
+        change: calculateChange(currentAmount, previousAmount),
+        trend: getTrend(currentAmount, previousAmount),
+        tooltip: "Total transaction amount this month",
       },
       {
-        label: "Receipts Processed",
-        value: currentReceipts,
-        icon: ReceiptIcon,
-        change: calculateChange(currentReceipts, previousReceipts),
-        trend: getTrend(currentReceipts, previousReceipts),
-        tooltip: "Documents and receipts processed this month",
-      },
-      {
-        label: "Transactions",
+        label: "Processed Transactions",
         value: currentTransactions.length,
         icon: BarChart3Icon,
         change: calculateChange(
@@ -170,12 +160,20 @@ export function DashboardOverview() {
         tooltip: "Total transactions recorded this month",
       },
       {
-        label: "Total Amount",
-        value: `£${currentAmount.toFixed(2)}`,
-        icon: FileSpreadsheetIcon,
-        change: calculateChange(currentAmount, previousAmount),
-        trend: getTrend(currentAmount, previousAmount),
-        tooltip: "Total transaction amount this month",
+        label: "Processed Documents",
+        value: currentReceipts,
+        icon: ReceiptIcon,
+        change: calculateChange(currentReceipts, previousReceipts),
+        trend: getTrend(currentReceipts, previousReceipts),
+        tooltip: "Documents and receipts processed this month",
+      },
+      {
+        label: "Chat Messages",
+        value: currentMessages,
+        icon: MessageSquareIcon,
+        change: calculateChange(currentMessages, previousMessages),
+        trend: getTrend(currentMessages, previousMessages),
+        tooltip: "Total WhatsApp messages processed this month",
       },
     ];
 
@@ -322,7 +320,7 @@ export function DashboardOverview() {
               "Drop your file here..."
             ) : (
               <>
-                Drag & drop a file here, or{" "}
+                Upload receipts here, or{" "}
                 <span className="text-blue-500">click to select file</span>
                 <br />
                 <span className="text-xs text-gray-500">

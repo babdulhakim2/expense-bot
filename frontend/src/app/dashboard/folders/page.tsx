@@ -132,10 +132,6 @@ export default function FoldersPage() {
               <ArrowUpDownIcon className="h-4 w-4" />
               Sort by {sortBy === "name" ? "Name" : "Last Updated"}
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-              <PlusIcon className="h-4 w-4" />
-              New Folder
-            </button>
           </div>
         </div>
 
