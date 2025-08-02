@@ -117,6 +117,9 @@ pids
 *.sqlite
 *.db
 
+# RAG Vector Database (LanceDB local data)
+.lancedb/
+
 # Project specific
 start-dev.sh
 notebooks/.ipynb_checkpoints/
