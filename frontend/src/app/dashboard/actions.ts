@@ -9,7 +9,6 @@ import { adminDb } from "@/lib/firebase/firebase-admin";
 export async function getServerBusinesses(): Promise<Business[]> {
   try {
     const session = (await getServerSession(authOptions)) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-    console.log("Session:", session);
 
     if (!session?.user) {
       return [];

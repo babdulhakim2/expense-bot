@@ -1,6 +1,15 @@
 "use client";
 
+import { useBusiness } from "@/app/providers/BusinessProvider";
+import { formatCurrency } from "@/lib/constants/currency";
 import { BusinessService } from "@/lib/firebase/services/business-service";
+import { formatDistanceToNow } from "date-fns";
+import {
+  ArrowDownIcon,
+  ChevronRightIcon
+} from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
 interface AIAction {
   id: string;
@@ -25,15 +34,6 @@ interface AIAction {
   description?: string;
   timestamp?: string | Date;
 }
-import { formatDistanceToNow } from "date-fns";
-import {
-  ArrowDownIcon,
-  ChevronRightIcon,
-  MessageSquareIcon,
-} from "lucide-react";
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useBusiness } from "@/app/providers/BusinessProvider";
 
 export function ActivityFeed() {
   const { currentBusiness, hasBusinesses, isInitialized } = useBusiness();
@@ -120,7 +120,13 @@ export function ActivityFeed() {
             <div className="space-y-1">
               <div className="flex items-center gap-3 text-xs text-gray-600">
                 <span>🏷️ {details.category}</span>
-                <span>💰 £{details.amount}</span>
+                <span>
+                  💰{" "}
+                  {formatCurrency(
+                    parseFloat(details.amount) || 0,
+                    currentBusiness?.currency
+                  )}
+                </span>
                 <span>💳 {details.paymentMethod}</span>
                 <span>🏢 {details.merchant}</span>
               </div>
@@ -129,7 +135,13 @@ export function ActivityFeed() {
                   {links.map((link, index) => (
                     <Link
                       key={index}
-                      href={link.url}
+                      href={
+                        link.url.includes("drive.google.com")
+                          ? `/api/documents/view?url=${encodeURIComponent(
+                              link.url
+                            )}`
+                          : link.url
+                      }
                       target="_blank"
                       className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
                     >
@@ -145,7 +157,9 @@ export function ActivityFeed() {
       case "document_stored":
         return action.document_url ? (
           <Link
-            href={action.document_url}
+            href={`/api/documents/view?url=${encodeURIComponent(
+              action.document_url
+            )}`}
             target="_blank"
             className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
           >
@@ -159,7 +173,9 @@ export function ActivityFeed() {
               <span className="text-gray-600">🏷️ {action.category}</span>
             )}
             {action.amount && (
-              <span className="text-gray-600">💰 £{action.amount.toFixed(2)}</span>
+              <span className="text-gray-600">
+                💰 {formatCurrency(action.amount, currentBusiness?.currency)}
+              </span>
             )}
             {action.merchant && (
               <span className="text-gray-600">🏢 {action.merchant}</span>
@@ -173,11 +189,7 @@ export function ActivityFeed() {
           </span>
         );
       case "folder_created":
-        return (
-          <span className="text-xs text-gray-600">
-            💼 {action.name}
-          </span>
-        );
+        return <span className="text-xs text-gray-600">💼 {action.name}</span>;
       default:
         return null;
     }
@@ -195,7 +207,7 @@ export function ActivityFeed() {
       amount:
         lines
           .find((l) => l.includes("💰"))
-          ?.split("£")[1]
+          ?.replace(/💰\s*[\$£€¥]+/, "")
           .trim() || "",
       date:
         lines
@@ -244,32 +256,6 @@ export function ActivityFeed() {
       });
   };
 
-  const getLinkStyle = (type: string) => {
-    switch (type) {
-      case "spreadsheet":
-        return "bg-emerald-50 text-emerald-700 hover:bg-emerald-100";
-      case "folder":
-        return "bg-blue-50 text-blue-700 hover:bg-blue-100";
-      case "dashboard":
-        return "bg-purple-50 text-purple-700 hover:bg-purple-100";
-      default:
-        return "bg-gray-50 text-gray-700 hover:bg-gray-100";
-    }
-  };
-
-  const getLinkIcon = (type: string) => {
-    switch (type) {
-      case "spreadsheet":
-        return "📊";
-      case "folder":
-        return "📁";
-      case "dashboard":
-        return "📊";
-      default:
-        return "🔗";
-    }
-  };
-
   if (!isInitialized || loading) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -286,7 +272,7 @@ export function ActivityFeed() {
           <div>
             <h2 className="text-lg font-semibold">Recent AI Activity</h2>
             <p className="text-sm text-gray-500">
-              Real-time updates of AI processing
+              Actions recenly taken by Expense Bot
             </p>
           </div>
         </div>
@@ -312,7 +298,7 @@ export function ActivityFeed() {
           <div>
             <h2 className="text-lg font-semibold">Recent AI Activity</h2>
             <p className="text-sm text-gray-500">
-              Real-time updates of AI processing
+              Actions recenly taken by Expense Bot
             </p>
           </div>
           {activities.length > 5 && (
@@ -374,7 +360,9 @@ export function ActivityFeed() {
                         <span className="text-red-600">❌</span>
                       )}
                     </div>
-                    <div className="mt-1 text-xs">{getActionDetails(activity)}</div>
+                    <div className="mt-1 text-xs">
+                      {getActionDetails(activity)}
+                    </div>
                   </div>
                 </div>
               </div>

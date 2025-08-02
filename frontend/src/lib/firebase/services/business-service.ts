@@ -161,9 +161,9 @@ export class BusinessService {
           name: legacyData?.name || "",
           type: legacyData?.type || "",
           location: legacyData?.location || "",
-          currency: legacyData?.currency || "GBP",
+          currency: legacyData?.currency || "USD",
           businessNumber: legacyData?.businessNumber || "",
-          userId: userIdOrData, // Store as userId for consistency
+          userId: userIdOrData, 
           primaryEmail: userEmail!,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -174,7 +174,7 @@ export class BusinessService {
           name: userIdOrData.name,
           type: userIdOrData.type,
           location: userIdOrData.location || "",
-          currency: userIdOrData.currency || "GBP",
+          currency: userIdOrData.currency || "USD",
           businessNumber: userIdOrData.businessNumber || "",
           userId: userIdOrData.userId,
           primaryEmail: userIdOrData.primaryEmail,
@@ -184,7 +184,6 @@ export class BusinessService {
       }
 
       await setDoc(businessRef, businessData);
-      console.log("Business created successfully with ID:", businessRef.id);
 
       const newBusiness: Business = {
         ...businessData,
@@ -294,7 +293,6 @@ export class BusinessService {
       );
 
       const snapshot = await getDocs(actionsQuery);
-      console.log("Snapshot:", snapshot);
       return snapshot.docs.map((doc) => {
         const data = doc.data();
         return {

@@ -5,7 +5,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 export const maxDuration = 250; 
 export const dynamic = 'force-dynamic';
 
-const FLASK_API_URL = process.env.NEXT_PUBLIC_FLASK_API_URL;
+const NEXT_PUBLIC_BACKEND_API_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL;
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     }
 
     // Forward to Flask backend
-    const response = await fetch(`${FLASK_API_URL}/api/upload`, {
+    const response = await fetch(`${NEXT_PUBLIC_BACKEND_API_URL}/api/upload`, {
       method: 'POST',
       body: formData, // Forward the entire FormData
     });

@@ -91,7 +91,6 @@ export function SmartBusinessSelector() {
     );
   }
 
-  // Has businesses state - show normal dropdown
   const category = currentBusiness
     ? BUSINESS_CATEGORIES.find((cat) => cat.id === currentBusiness.type) ||
       BUSINESS_CATEGORIES[0]

@@ -13,7 +13,6 @@ const verifyToken = async (token: string): Promise<DecodedIdToken | null> => {
       const decodedPayload = JSON.parse(
         Buffer.from(payload, "base64").toString()
       );
-      console.log("Decoded token payload in development:", decodedPayload);
       return decodedPayload;
     } catch (error) {
       console.error("Error parsing development token:", error);

@@ -31,7 +31,6 @@ export function BusinessSelector() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loadingBusinesses, setLoadingBusinesses] = useState(false);
 
-  // Load all businesses for the user
   useEffect(() => {
     const loadBusinesses = async () => {
       const user = await getServerUser();
@@ -65,7 +64,6 @@ export function BusinessSelector() {
         title: "Business Switched",
         description: `Now viewing ${business.name}`,
       });
-      // Reload the page to refresh all data
       window.location.reload();
     } catch (error) {
       console.error("Failed to switch business:", error);

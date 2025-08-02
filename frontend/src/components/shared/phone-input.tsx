@@ -1,13 +1,16 @@
-'use client';
+"use client";
 
-import { cn } from "@/lib/utils";
-import PhoneInput, { Country, formatPhoneNumber as formatPhoneNumberIntl } from 'react-phone-number-input';
-import { isValidPhoneNumber } from 'react-phone-number-input';
-import 'react-phone-number-input/style.css';
+import { cn } from "@/utils/utils";
+import PhoneInput, {
+  Country,
+  formatPhoneNumber as formatPhoneNumberIntl,
+} from "react-phone-number-input";
+import { isValidPhoneNumber } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 import { CheckCircle2, XCircle } from "lucide-react";
 
 // Define the countries we want to allow
-const allowedCountries: Country[] = ['CA','GB', 'US'];
+const allowedCountries: Country[] = ["CA", "GB", "US"];
 
 interface PhoneNumberInputProps {
   value: string;
@@ -17,15 +20,15 @@ interface PhoneNumberInputProps {
   className?: string;
 }
 
-export function PhoneNumberInput({ 
-  value, 
-  onChange, 
-  disabled, 
+export function PhoneNumberInput({
+  value,
+  onChange,
+  disabled,
   error,
-  className 
+  className,
 }: PhoneNumberInputProps) {
   const isValid = value ? isValidPhoneNumber(value) : undefined;
-  const formattedNumber = value ? formatPhoneNumberIntl(value) : '';
+  const formattedNumber = value ? formatPhoneNumberIntl(value) : "";
 
   return (
     <div className="space-y-2">
@@ -35,7 +38,7 @@ export function PhoneNumberInput({
           defaultCountry="GB"
           countries={allowedCountries}
           value={value}
-          onChange={(newValue) => onChange(newValue || '')}
+          onChange={(newValue) => onChange(newValue || "")}
           disabled={disabled}
           className={cn(
             "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background",
@@ -76,4 +79,4 @@ export function PhoneNumberInput({
       )}
     </div>
   );
-} 
+}
