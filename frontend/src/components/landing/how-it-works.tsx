@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Cloud, FolderOpen, Sparkles, ArrowRight } from "lucide-react";
+import { Cloud, FolderOpen, Sparkles, ArrowRight, MessageSquare } from "lucide-react";
 import { useInView } from "react-intersection-observer";
 import { FolderSetupPreview } from "./folder-setup-preview";
 
@@ -62,9 +62,9 @@ const steps = [
   },
   {
     icon: <Sparkles className="w-12 h-12 text-purple-600 mb-4" />,
-    title: "Upload & Let AI Work",
+    title: "AI Organizes Everything",
     description:
-      "Drop your receipts, invoices, and financial documents into your input folder. AI automatically categorizes, extracts data, and organizes everything.",
+      "Drop your receipts, invoices, and financial documents into your input folder. AI automatically categorizes, extracts data, and creates organized Google Sheets.",
     highlight: "Automatic processing",
     visual: (
       <div className="w-full max-w-xs mx-auto">
@@ -82,11 +82,38 @@ const steps = [
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-purple-700">Category assigned</span>
+              <span className="text-purple-700">Google Sheets created</span>
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-purple-700">File organized</span>
+              <span className="text-purple-700">Files organized</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+  },
+  {
+    icon: <MessageSquare className="w-12 h-12 text-green-600 mb-4" />,
+    title: "Ask & Get Answers",
+    description:
+      "Simply ask questions about your expenses in plain English. 'How much did I spend on restaurants last month?' Get instant, accurate answers from your organized data.",
+    highlight: "AI-powered search",
+    visual: (
+      <div className="w-full max-w-xs mx-auto">
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+          <div className="text-center mb-3">
+            <div className="inline-flex items-center space-x-1 text-green-700 text-sm font-medium">
+              <MessageSquare className="w-4 h-4" />
+              <span>Smart Search</span>
+            </div>
+          </div>
+          <div className="space-y-2 text-xs">
+            <div className="bg-white/70 rounded px-2 py-1 text-green-800">
+              "Coffee expenses this week?"
+            </div>
+            <div className="text-green-700 font-medium">
+              → $47.50 across 5 transactions
             </div>
           </div>
         </div>
@@ -118,12 +145,12 @@ export function HowItWorks() {
           transition={{ delay: 0.2, duration: 0.5 }}
           className="text-lg text-muted-foreground max-w-2xl mx-auto"
         >
-          Three simple steps to transform your financial chaos into organized
+          Four simple steps to transform your financial chaos into organized
           clarity
         </motion.p>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-12 lg:gap-8">
+      <div className="grid lg:grid-cols-4 gap-12 lg:gap-8">
         {steps.map((step, index) => (
           <motion.div
             key={index}

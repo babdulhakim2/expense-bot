@@ -1,32 +1,32 @@
 "use client";
 
 import { motion } from 'framer-motion';
-import { FolderSync, Shield, BarChart3, Clock } from 'lucide-react';
+import { FolderSync, Shield, MessageSquare, FileSpreadsheet } from 'lucide-react';
 import { useInView } from 'react-intersection-observer';
 
 const features = [
   {
-    icon: <FolderSync className="w-10 h-10 text-blue-600 mb-4" />,
-    title: "Smart Organization",
-    description: "AI automatically categorizes and sorts your financial documents into intuitive folder structures within your Google Drive.",
-    color: "blue"
-  },
-  {
-    icon: <Shield className="w-10 h-10 text-green-600 mb-4" />,
-    title: "Your Data, Your Drive",
-    description: "Everything stays in your familiar Google Drive ecosystem. No external servers, no data privacy concerns - complete control.",
+    icon: <FileSpreadsheet className="w-10 h-10 text-green-600 mb-4" />,
+    title: "Google Sheets Magic",
+    description: "Harness the full power of Google Sheets for expense tracking. Automatic categorization, formulas, and charts - all in your familiar spreadsheet environment.",
     color: "green"
   },
   {
-    icon: <BarChart3 className="w-10 h-10 text-purple-600 mb-4" />,
-    title: "Financial Insights",
-    description: "Transform chaos into clear expense reports and analytics. Understand your spending patterns with AI-powered insights.",
+    icon: <MessageSquare className="w-10 h-10 text-blue-600 mb-4" />,
+    title: "Ask Anything",
+    description: "Simply ask questions about your expenses in plain English. 'How much did I spend on restaurants?' - get instant AI-powered answers.",
+    color: "blue"
+  },
+  {
+    icon: <FolderSync className="w-10 h-10 text-purple-600 mb-4" />,
+    title: "Smart Organization",
+    description: "AI automatically categorizes and sorts your financial documents into intuitive folder structures within your Google Drive.",
     color: "purple"
   },
   {
-    icon: <Clock className="w-10 h-10 text-amber-600 mb-4" />,
-    title: "Save Hours Weekly", 
-    description: "Eliminate manual sorting and data entry. What used to take hours now happens automatically in seconds.",
+    icon: <Shield className="w-10 h-10 text-amber-600 mb-4" />,
+    title: "Your Data, Your Drive",
+    description: "Everything stays in your familiar Google Drive ecosystem. No external servers, no data privacy concerns - complete control.",
     color: "amber"
   }
 ];
@@ -58,7 +58,7 @@ export function FeaturesGrid() {
           transition={{ delay: 0.2, duration: 0.5 }}
           className="text-lg text-muted-foreground max-w-2xl mx-auto"
         >
-          Built specifically for Google Drive users who want AI-powered expense organization
+          Combine the power of Google Sheets with AI to transform how you manage expenses
         </motion.p>
       </div>
 

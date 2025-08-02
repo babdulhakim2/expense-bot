@@ -65,6 +65,23 @@ class Config:
     # Google Drive Base Path
     GOOGLE_DRIVE_BASE_PATH = os.getenv('GOOGLE_DRIVE_BASE_PATH', 'ExpenseBot-Dev')
     
+    # RAG Performance Configuration
+    ENABLE_PARALLEL_PROCESSING = os.getenv('ENABLE_PARALLEL_PROCESSING', 'true').lower() == 'true'
+    AUTO_RETRY_FAILED = os.getenv('AUTO_RETRY_FAILED', 'true').lower() == 'true'
+    MAX_INDEXING_RETRIES = int(os.getenv('MAX_INDEXING_RETRIES', '3'))
+    CHUNK_BATCH_SIZE = int(os.getenv('CHUNK_BATCH_SIZE', '50'))
+    RAG_MAX_WORKERS = int(os.getenv('RAG_MAX_WORKERS', '4'))
+    RAG_PROCESSING_TIMEOUT = int(os.getenv('RAG_PROCESSING_TIMEOUT', '300'))  # 5 minutes
+    
+    # RAG Performance Configuration (legacy - now handled by RAG Cloud Function)
+    # These are kept for backward compatibility but should be removed in future versions
+    
+    # RAG Cloud Function Configuration
+    RAG_FUNCTION_URL = os.getenv('RAG_FUNCTION_URL')  # URL of deployed RAG Cloud Function
+    RAG_INDEXING_TOPIC = os.getenv('RAG_INDEXING_TOPIC', 'rag-indexing-jobs')
+    RAG_RESULT_TOPIC = os.getenv('RAG_RESULT_TOPIC', 'rag-indexing-results')
+    USE_CLOUD_FUNCTION_INDEXING = os.getenv('USE_CLOUD_FUNCTION_INDEXING', 'false').lower() == 'true'
+    
     @classmethod
     def validate_config(cls):
         """Validate required configuration values"""

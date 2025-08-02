@@ -30,9 +30,9 @@ export function HeroSection() {
           transition={{ delay: 0.4, duration: 0.5 }}
           className="text-base sm:text-lg text-muted-foreground max-w-2xl"
         >
-          Transform your messy financial documents into organized, categorized
-          expenses. Simply connect two folders in your Google Drive - one for
-          chaos, one for clarity.
+          Transform your messy financial documents into organized Google Sheets and folders.
+          Ask questions about your expenses and get instant AI-powered answers.
+          Harness the power of Google Sheets for effortless financial management.
         </motion.p>
 
         {/* Call to Action */}
@@ -94,21 +94,21 @@ export function HeroSection() {
                 <div className="text-sm font-medium text-primary">AI Magic</div>
               </div>
 
-              {/* After - Organized Folder */}
+              {/* After - Organized Google Sheets */}
               <div className="flex-1 text-center w-full">
                 <div className="bg-green-50 dark:bg-green-950/30 border-2 border-green-200 dark:border-green-800 rounded-lg p-4 sm:p-6 mb-3">
                   <div className="text-green-600 dark:text-green-400 text-sm font-medium mb-2">
-                    📁 Organized Expenses
+                    📊 Smart Google Sheets
                   </div>
                   <div className="space-y-1 text-xs text-green-700 dark:text-green-300">
-                    <div>📋 Office Supplies/</div>
-                    <div>🍽️ Meals & Entertainment/</div>
-                    <div>🚗 Transportation/</div>
-                    <div>📊 Reports & Analytics/</div>
+                    <div>🍽️ Restaurant: $45.20</div>
+                    <div>🚗 Uber: $23.50</div>
+                    <div>📋 Office: $112.80</div>
+                    <div>💬 "Total spent on meals?"</div>
                   </div>
                 </div>
                 <span className="text-sm text-muted-foreground">
-                  Perfectly categorized
+                  Searchable & trackable
                 </span>
               </div>
             </div>
@@ -116,7 +116,7 @@ export function HeroSection() {
             {/* Mobile-friendly call to action */}
             <div className="mt-6 pt-6 border-t border-border/50 text-center">
               <p className="text-xs text-muted-foreground">
-                Transform your expense chaos into organized clarity with AI
+                Ask questions, get answers, and track expenses with the power of Google Sheets and AI
               </p>
             </div>
           </div>

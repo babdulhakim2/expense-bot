@@ -3,8 +3,16 @@ name: ExpenseBot CI/CD Pipeline
 on:
   push:
     branches: [main, dev]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/**'
+      - 'infra/terraform/**'
   pull_request:
     branches: [main, dev]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/**'
+      - 'infra/terraform/**'
 
 env:
   REGISTRY: us-central1-docker.pkg.dev
@@ -200,14 +208,24 @@ jobs:
             -var-file=environments/${{ steps.env.outputs.environment }}.tfvars \
             -out=tfplan
 
-      - name: Package and upload Cloud Function
+      - name: Package and upload Cloud Functions
         run: |
-          # Create zip of function source
+          # Create zip of expense processor function source
           cd backend/functions/expense_processor
           zip -r function-source.zip . -x "*.pyc" "__pycache__/*" ".pytest_cache/*"
           
-          # Upload to function source bucket
+          # Upload expense processor to function source bucket
           gsutil cp function-source.zip gs://${{ secrets.GCP_PROJECT_ID }}-function-source-${{ steps.env.outputs.environment }}/function-source.zip
+          
+          # Return to root directory
+          cd ../../../
+          
+          # Create zip of RAG processor function source
+          cd backend/functions/rag_processor
+          zip -r rag_processor-source.zip . -x "*.pyc" "__pycache__/*" ".pytest_cache/*" "tests/*" ".env.local" "data/*"
+          
+          # Upload RAG processor to function source bucket
+          gsutil cp rag_processor-source.zip gs://${{ secrets.GCP_PROJECT_ID }}-function-source-${{ steps.env.outputs.environment }}/rag_processor-source.zip
 
       - name: Terraform Apply
         working-directory: infra/terraform
