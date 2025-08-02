@@ -77,3 +77,13 @@ output "expense_scheduler" {
   description = "Scheduler job for expense organization"
   value       = var.deploy_applications ? google_cloud_scheduler_job.expense_organization[0].name : null
 }
+
+output "rag_function_name" {
+  description = "Cloud Function name for RAG processing"
+  value       = var.deploy_applications ? google_cloudfunctions2_function.rag_processor[0].name : null
+}
+
+output "rag_function_url" {
+  description = "URL of the RAG Cloud Function"
+  value       = var.deploy_applications ? google_cloudfunctions2_function.rag_processor[0].service_config[0].uri : null
+}

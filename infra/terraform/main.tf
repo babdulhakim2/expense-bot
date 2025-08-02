@@ -406,6 +406,55 @@ resource "google_cloudfunctions2_function" "expense_processor" {
   depends_on = [google_project_service.apis]
 }
 
+# Cloud Function Gen2 for RAG processing
+resource "google_cloudfunctions2_function" "rag_processor" {
+  count    = var.deploy_applications ? 1 : 0
+  name     = "rag-processor-${var.environment}"
+  location = var.region
+
+  build_config {
+    runtime     = "python311"
+    entry_point = "rag_processor"
+    source {
+      storage_source {
+        bucket = google_storage_bucket.function_source[0].name
+        object = "rag_processor-source.zip"
+      }
+    }
+  }
+
+  service_config {
+    max_instance_count    = var.environment == "production" ? 10 : 5
+    min_instance_count    = 0
+    available_memory      = "1Gi"  # Start with 1GB as requested
+    timeout_seconds       = 540
+    service_account_email = data.google_service_account.function_sa[0].email
+
+    environment_variables = {
+      PROJECT_ID         = var.project_id
+      ENVIRONMENT        = var.environment
+      FUNCTION_NAME      = "rag-processor-${var.environment}"
+      LANCEDB_TABLE_NAME = var.environment == "production" ? "expense_documents" : "expense_documents_dev"
+      # Temporarily hardcode LanceDB values to get function deployed
+      LANCEDB_URI        = "db://expense-bot-yoktc7"
+      LANCEDB_API_KEY    = "sk_AVWJKGPQRNE4POBU3QZVHWVGCNWART4GP5774NKSDELWCGDTFPYA===="
+      LANCEDB_REGION     = "us-east-1"
+    }
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+# Cloud Function IAM - Allow public access for testing
+resource "google_cloudfunctions2_function_iam_member" "rag_invoker" {
+  count          = var.deploy_applications ? 1 : 0
+  location       = google_cloudfunctions2_function.rag_processor[0].location
+  project        = google_cloudfunctions2_function.rag_processor[0].project
+  cloud_function = google_cloudfunctions2_function.rag_processor[0].name
+  role           = "roles/cloudfunctions.invoker"
+  member         = "allUsers"
+}
+
 # Cloud Scheduler job for expense organization
 resource "google_cloud_scheduler_job" "expense_organization" {
   count       = var.deploy_applications ? 1 : 0

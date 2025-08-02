@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from twilio.twiml.messaging_response import MessagingResponse
 import requests
 from dotenv import load_dotenv
@@ -27,7 +27,11 @@ app = Flask(__name__)
 
 # Import and register blueprints
 from routes.tasks import tasks_bp
+from routes.rag_api import rag_bp
+from routes.documents import documents_bp
 app.register_blueprint(tasks_bp)
+app.register_blueprint(rag_bp)
+app.register_blueprint(documents_bp)
 
 # Initialize services with config
 gemini_service = AIService()  # Primary service now
@@ -50,6 +54,104 @@ def health_check():
     Health check endpoint to verify if the server is running.
     """
     return jsonify({'status': 'ok', 'timestamp': datetime.now().isoformat()}), 200
+
+
+@app.route('/rag-benchmark', methods=['GET'])
+def rag_benchmark():
+    """
+    Serve the RAG system benchmarking dashboard
+    """
+    return render_template('rag_benchmark.html')
+
+@app.route('/api/search', methods=['POST'])
+def search_documents():
+    """
+    Search documents using RAG for frontend integration
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+        
+        # Validate required fields
+        query = data.get('query', '').strip()
+        business_id = data.get('business_id', '').strip()
+        
+        if not query:
+            return jsonify({'error': 'Query is required'}), 400
+        
+        if not business_id:
+            return jsonify({'error': 'Business ID is required'}), 400
+        
+        # Optional parameters
+        limit = min(data.get('limit', 10), 20)  # Cap at 20 for frontend
+        
+        # Get RAG client
+        try:
+            from services.rag_client import get_rag_client
+            rag_client = get_rag_client()
+            if not rag_client or not rag_client.enabled:
+                return jsonify({'error': 'RAG service not available or not configured'}), 503
+        except Exception as e:
+            return jsonify({'error': f'RAG service error: {str(e)}'}), 503
+        
+        # Perform search
+        response = rag_client.search(
+            query=query,
+            business_id=business_id,
+            limit=limit,
+            filters=data.get('filters', {}),
+            enhance_query=True
+        )
+
+        print(f"RAG search response: {response}")  # Debugging line
+        logger.info(f"RAG search response: {response}")
+        
+        # Handle response from RAG client
+        if not response:
+            return jsonify({'error': 'No response from RAG service'}), 500
+        
+        # Check if response contains an error
+        if 'error' in response:
+            error_msg = response.get('error', 'Unknown error')
+            return jsonify({'error': f'Search failed: {error_msg}'}), 500
+        
+        # Format response for frontend
+        results = response.get('results', [])
+        formatted_results = []
+        
+        for result in results:
+            # Extract metadata
+            metadata = result.get('metadata', {})
+            drive_link = metadata.get('drive_url') or metadata.get('google_drive_url')
+            
+            formatted_result = {
+                'id': result.get('id', result.get('chunk_id', 'unknown')),
+                'document_id': result.get('document_id', 'unknown'),
+                'content': result.get('content', '')[:300] + ('...' if len(result.get('content', '')) > 300 else ''),
+                'score': round(result.get('score', 0.0), 3),
+                'document_type': metadata.get('document_type', 'unknown'),
+                'date': metadata.get('date') or metadata.get('created_at'),
+                'amount': metadata.get('amount'),
+                'category': metadata.get('category'),
+                'merchant': metadata.get('merchant'),
+                'drive_url': drive_link
+            }
+            formatted_results.append(formatted_result)
+        
+        return jsonify({
+            'success': True,
+            'query': response.get('query', query),
+            'results': formatted_results,
+            'total_results': response.get('total_results', len(formatted_results)),
+            'processing_time': response.get('processing_time', 0.0),
+            'search_method': response.get('search_method', 'rag_function')
+        })
+        
+    except Exception as e:
+        logger.error(f"Search error: {str(e)}")
+        return jsonify({'error': 'Search failed', 'details': str(e)}), 500
 
 
 
@@ -81,7 +183,6 @@ def whatsapp():
         msg = resp.message()
 
         # Check if user exists
-        print(f"Checking if user exists: {phone_number}")
         user = firebase_service.get_user_by_phone(phone_number)
         if not user:
             registration_url = 'https://expensebot.xyz'
@@ -577,6 +678,59 @@ def upload_file():
             related_id=expense['id'] if is_transaction else None
         )
 
+        # Index document in RAG (async)
+        rag_job_id = None
+        try:
+            from services.rag_client import get_rag_client
+            rag_client = get_rag_client()
+            if rag_client and rag_client.enabled:
+                # Save file temporarily for RAG indexing
+                import tempfile
+                import hashlib
+                
+                # Generate document hash
+                document_hash = hashlib.sha256(file_content).hexdigest()
+                
+                with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
+                    temp_file.write(file_content)
+                    temp_path = temp_file.name
+                
+                # Add to RAG indexing queue
+                rag_metadata = {
+                    'document_hash': document_hash,
+                    'file_size': len(file_content),
+                    'original_filename': file.filename,
+                    'document_type': document_type,
+                    'drive_url': stored_document['url'],
+                    'google_drive_url': stored_document['url']
+                }
+                
+                # Add transaction metadata if available
+                if is_transaction:
+                    rag_metadata.update({
+                        'expense_id': expense['id'],
+                        'amount': transaction.get('amount'),
+                        'category': transaction.get('category'),
+                        'merchant': transaction.get('merchant'),
+                        'date': transaction.get('transaction_date')
+                    })
+                
+                # Use RAG client to index document
+                response = rag_client.index_document(
+                    business_id=business_id,
+                    document_id=stored_document.get('id', 'unknown'),
+                    drive_url=stored_document['url'],
+                    metadata=rag_metadata
+                )
+                
+                if response and response.get('success'):
+                    rag_job_id = response.get('job_id', 'unknown')
+                
+                logger.info(f"Document queued for RAG indexing: {rag_job_id}")
+        except Exception as e:
+            logger.warning(f"Failed to index document in RAG: {str(e)}")
+            # Don't fail the entire upload for RAG indexing issues
+
         # Prepare response
         response_data = {
             'success': True,
@@ -584,6 +738,10 @@ def upload_file():
                 'url': stored_document['url'],
                 'type': document_type,
                 'date': document_date
+            },
+            'rag_indexing': {
+                'job_id': rag_job_id,
+                'queued': rag_job_id is not None
             }
         }
 
