@@ -330,3 +330,45 @@ class GoogleDriveService:
         except Exception as e:
             logger.error(f"Error uploading file: {str(e)}")
             raise 
+
+    def download_file(self, file_id: str) -> bytes:
+        """Download file content from Google Drive"""
+        try:
+            # Get file metadata first to check if it exists
+            file_metadata = self.drive_service.files().get(fileId=file_id, fields='id, name, mimeType').execute()
+            logger.debug(f"Downloading file: {file_metadata.get('name')} ({file_metadata.get('mimeType')})")
+            
+            # Download the file content
+            request = self.drive_service.files().get_media(fileId=file_id)
+            file_content = request.execute()
+            
+            logger.info(f"Successfully downloaded file {file_id}, size: {len(file_content)} bytes")
+            return file_content
+            
+        except Exception as e:
+            logger.error(f"Error downloading file {file_id}: {str(e)}")
+            raise
+
+    def extract_file_id_from_url(self, drive_url: str) -> str:
+        """Extract file ID from Google Drive URL"""
+        try:
+            # Handle different Drive URL formats:
+            # https://drive.google.com/file/d/FILE_ID/view
+            # https://drive.google.com/open?id=FILE_ID
+            # https://drive.google.com/file/d/FILE_ID/edit
+            
+            if '/file/d/' in drive_url:
+                # Format: https://drive.google.com/file/d/FILE_ID/view
+                file_id = drive_url.split('/file/d/')[1].split('/')[0]
+            elif 'id=' in drive_url:
+                # Format: https://drive.google.com/open?id=FILE_ID
+                file_id = drive_url.split('id=')[1].split('&')[0]
+            else:
+                raise ValueError(f"Cannot extract file ID from URL: {drive_url}")
+            
+            logger.debug(f"Extracted file ID {file_id} from URL {drive_url}")
+            return file_id
+            
+        except Exception as e:
+            logger.error(f"Error extracting file ID from URL {drive_url}: {str(e)}")
+            raise
