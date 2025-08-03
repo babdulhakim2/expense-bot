@@ -124,11 +124,14 @@ resource "google_cloud_run_service" "backend_api" {
 
   template {
     metadata {
+      name = "${var.environment}-${substr(var.backend_image_tag, 0, 8)}"
+
       annotations = {
         "autoscaling.knative.dev/minScale"         = var.environment == "production" ? "2" : "0"
         "autoscaling.knative.dev/maxScale"         = var.environment == "production" ? "100" : "10"
         "run.googleapis.com/cpu-throttling"        = "false"
         "run.googleapis.com/execution-environment" = "gen2"
+        "run.googleapis.com/launch-stage"          = "GA"
       }
     }
 
@@ -220,6 +223,10 @@ resource "google_cloud_run_service" "backend_api" {
   traffic {
     percent         = 100
     latest_revision = true
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 
   depends_on = [google_project_service.apis]
@@ -403,9 +410,9 @@ resource "google_cloudfunctions2_function" "expense_processor" {
 
   event_trigger {
     trigger_region        = var.region
-    event_type           = "google.cloud.pubsub.topic.v1.messagePublished"
-    pubsub_topic         = google_pubsub_topic.expense_organization[0].id
-    retry_policy         = "RETRY_POLICY_RETRY"
+    event_type            = "google.cloud.pubsub.topic.v1.messagePublished"
+    pubsub_topic          = google_pubsub_topic.expense_organization[0].id
+    retry_policy          = "RETRY_POLICY_RETRY"
     service_account_email = data.google_service_account.function_sa[0].email
   }
 
@@ -432,7 +439,7 @@ resource "google_cloudfunctions2_function" "rag_processor" {
   service_config {
     max_instance_count    = var.environment == "production" ? 10 : 5
     min_instance_count    = 0
-    available_memory      = "1Gi"  # Start with 1GB as requested
+    available_memory      = "1Gi" # Start with 1GB as requested
     timeout_seconds       = 540
     service_account_email = data.google_service_account.function_sa[0].email
 
@@ -470,7 +477,7 @@ resource "google_cloud_scheduler_job" "expense_organization" {
   count       = var.deploy_applications ? 1 : 0
   name        = "expense-organization-${var.environment}"
   description = "Daily expense organization at 2 AM"
-  schedule    = "0 2 * * *"  # 2 AM daily
+  schedule    = "0 2 * * *" # 2 AM daily
   time_zone   = "UTC"
 
   pubsub_target {
