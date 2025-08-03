@@ -11,7 +11,7 @@ Give AI access to two Google Drive folders and watch it automatically organize y
 
 ## 🏗️ System Overview
 
-ExpenseBot is a production-grade AI system that automates expense tracking through advanced retrieval-augmented generation (RAG), custom vision models, and enterprise infrastructure. It processes receipt images via WhatsApp, extracts structured data using fine-tuned PaliGemma models, and organizes expenses intelligently in Google Drive.
+ExpenseBot is a production-grade AI system that automates expense and organizing all on Google drive and Google sheet with advanced retrieval-augmented generation (RAG), custom vision models, and enterprise infrastructure. It processes receipt images via upload on the UI or via WhatsApp message, or just reading a chosen drive folder and organizes expenses intelligently in Google Drive.
 
 ### Key Features
 
