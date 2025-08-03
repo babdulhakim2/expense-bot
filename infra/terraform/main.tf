@@ -30,12 +30,6 @@ provider "google-beta" {
 # Data sources
 data "google_project" "project" {}
 
-# GitHub Actions service account (pre-created, managed outside Terraform)
-data "google_service_account" "github_actions" {
-  account_id = "expense-bot-githubactions"
-  project    = var.project_id
-}
-
 # Enable required APIs
 resource "google_project_service" "apis" {
   for_each = toset([
