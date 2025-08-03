@@ -1,4 +1,4 @@
-.PHONY: help install dev frontend backend emulators test build clean lint setup health-check infra infra-stop infra-logs docker-backend docker-frontend docker-stop docker-clean deploy-dev deploy-prod destroy-dev destroy-prod
+.PHONY: help install dev frontend backend emulators test build clean lint setup health-check infra infra-stop infra-logs docker-backend docker-frontend docker-stop docker-clean deploy-dev deploy-prod destroy-dev destroy-prod rag-local rag-test rag-deploy-dev rag-deploy-prod rag-clean
 
 # Default target
 help: ## Show this help message
@@ -208,3 +208,35 @@ logs: ## Show logs from all services
 	@tail -n 20 frontend/.next/trace 2>/dev/null || echo "No frontend logs"
 	@echo "=== Backend logs ==="
 	@tail -n 20 backend/*.log 2>/dev/null || echo "No backend logs"
+
+# RAG Function targets
+rag-local: ## Start RAG processor locally with local LanceDB
+	@echo "🧠 Starting RAG processor locally..."
+	@cd functions/rag-processor && \
+	if [ ! -d "data" ]; then mkdir -p data; fi && \
+	LANCEDB_URI="./data/lancedb" \
+	LANCEDB_API_KEY="" \
+	LANCEDB_REGION="" \
+	LANCEDB_TABLE_NAME="expense_documents_local" \
+	ENVIRONMENT="local" \
+	python local_test.py
+
+rag-test: ## Run RAG function tests
+	@echo "🧪 Running RAG tests..."
+	@cd functions/rag-processor && python -m pytest tests/ -v || echo "⚠️ No RAG tests found"
+
+rag-deploy-dev: ## Deploy RAG function to development
+	@echo "🚀 Deploying RAG function to development..."
+	@cd functions/rag-processor && ./deploy.sh development
+
+rag-deploy-prod: ## Deploy RAG function to production
+	@echo "🚀 Deploying RAG function to production..."
+	@cd functions/rag-processor && ./deploy.sh production
+
+rag-clean: ## Clean RAG local data and cache
+	@echo "🧹 Cleaning RAG local data..."
+	@rm -rf functions/rag-processor/.lancedb
+	@rm -rf functions/rag-processor/data
+	@rm -rf functions/rag-processor/__pycache__
+	@find functions/rag-processor -name "*.pyc" -delete
+	@echo "✅ RAG cleanup complete"

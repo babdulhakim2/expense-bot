@@ -150,3 +150,9 @@ variable "log_level" {
     error_message = "Log level must be one of: DEBUG, INFO, WARNING, ERROR, CRITICAL."
   }
 }
+
+variable "backend_image_tag" {
+  description = "Docker image tag for backend service"
+  type        = string
+  default     = "latest"
+}

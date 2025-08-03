@@ -206,6 +206,7 @@ jobs:
         run: |
           terraform plan \
             -var-file=environments/${{ steps.env.outputs.environment }}.tfvars \
+            -var="backend_image_tag=${{ github.sha }}" \
             -out=tfplan
 
       - name: Package and upload Cloud Functions
