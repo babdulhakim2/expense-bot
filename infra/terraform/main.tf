@@ -118,7 +118,8 @@ resource "google_cloud_run_service" "backend_api" {
 
   template {
     metadata {
-      name = "${var.environment}-${substr(var.backend_image_tag, 0, 8)}"
+      # Revision name must be prefixed with service name
+      name = "expense-bot-backend-${var.environment}-${substr(var.backend_image_tag, 0, 8)}"
 
       annotations = {
         "autoscaling.knative.dev/minScale"         = var.environment == "production" ? "2" : "0"
