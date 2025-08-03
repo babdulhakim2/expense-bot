@@ -93,7 +93,7 @@ output "backend_image_tag" {
   value       = var.backend_image_tag
 }
 
-output "github_actions_service_account" {
-  description = "Service account used by GitHub Actions"
-  value       = data.google_service_account.github_actions.email
-}
+# output "github_actions_service_account" {
+#   description = "Service account used by GitHub Actions"
+#   value       = data.google_service_account.github_actions.email
+# }
