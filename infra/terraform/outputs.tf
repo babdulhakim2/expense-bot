@@ -87,3 +87,13 @@ output "rag_function_url" {
   description = "URL of the RAG Cloud Function"
   value       = var.deploy_applications ? google_cloudfunctions2_function.rag_processor[0].service_config[0].uri : null
 }
+
+output "backend_image_tag" {
+  description = "Current backend image tag"
+  value       = var.backend_image_tag
+}
+
+output "github_actions_service_account" {
+  description = "Service account used by GitHub Actions"
+  value       = data.google_service_account.github_actions.email
+}

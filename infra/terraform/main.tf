@@ -30,6 +30,12 @@ provider "google-beta" {
 # Data sources
 data "google_project" "project" {}
 
+# GitHub Actions service account (pre-created, managed outside Terraform)
+data "google_service_account" "github_actions" {
+  account_id = "expense-bot-githubactions"
+  project    = var.project_id
+}
+
 # Enable required APIs
 resource "google_project_service" "apis" {
   for_each = toset([
@@ -130,7 +136,7 @@ resource "google_cloud_run_service" "backend_api" {
       service_account_name = data.google_service_account.cloud_run.email
 
       containers {
-        image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.expense_bot.repository_id}/backend:latest"
+        image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.expense_bot.repository_id}/backend:${var.backend_image_tag}"
 
         ports {
           container_port = 8080
@@ -435,10 +441,14 @@ resource "google_cloudfunctions2_function" "rag_processor" {
       ENVIRONMENT        = var.environment
       FUNCTION_NAME      = "rag-processor-${var.environment}"
       LANCEDB_TABLE_NAME = var.environment == "production" ? "expense_documents" : "expense_documents_dev"
-      # Temporarily hardcode LanceDB values to get function deployed
-      LANCEDB_URI        = "db://expense-bot-yoktc7"
-      LANCEDB_API_KEY    = "sk_AVWJKGPQRNE4POBU3QZVHWVGCNWART4GP5774NKSDELWCGDTFPYA===="
-      LANCEDB_REGION     = "us-east-1"
+    }
+
+    # All RAG secrets from a single Google Secret Manager reference
+    secret_environment_variables {
+      key        = "RAG_SECRETS"
+      project_id = var.project_id
+      secret     = "expense-bot-rag-secrets"
+      version    = "latest"
     }
   }
 
